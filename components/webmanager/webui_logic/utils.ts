@@ -45,7 +45,7 @@ export function T(parent:Element, templateId:string):Element{
  * @param textContent 
  * @returns 
  */
-export function A(parent: HTMLElement, type:"tr"|"td"|"a"|"div"|"option"|"select",  classes?: string[], textContent?:string){
+export function A(parent: HTMLElement, type:"tr"|"td"|"a"|"div"|"option"|"select"|"p",  classes?: string[], textContent?:string){
     return parent.appendChild(E(HTMLNS, type, classes, textContent)) as HTMLElement;
 }
 

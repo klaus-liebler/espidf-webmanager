@@ -3,6 +3,7 @@ include "systeminfo.fbs";
 include "usersettings.fbs";
 include "timeseries.fbs";
 include "websensact.fbs";
+include "fingerprint.fbs";
 
 namespace webmanager;
 
@@ -23,7 +24,7 @@ table ResponseJournal{
     journal_items:[JournalItem];
 }
 
-table LiveLogItem{
+table NotifyLiveLogItem{
     text:string;
 }
 
@@ -31,6 +32,7 @@ table LiveLogItem{
 
 
 union Message{
+    NotifyLiveLogItem, 
     RequestNetworkInformation, 
     ResponseNetworkInformation, 
     RequestWifiConnect, 
@@ -40,7 +42,6 @@ union Message{
     ResponseWifiDisconnect, 
     RequestSystemData, 
     ResponseSystemData, 
-    LiveLogItem, 
     RequestJournal, 
     ResponseJournal, 
     RequestRestart, 
@@ -49,7 +50,7 @@ union Message{
     RequestSetUserSettings, 
     ResponseSetUserSettings,
     RequestTimeseries,
-    ResponseTimeseriesDummy
+    ResponseTimeseriesDummy,
     }
 
 

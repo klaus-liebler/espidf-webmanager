@@ -1,7 +1,7 @@
 import { MessageWrapper, } from "../flatbuffers_gen/webmanager/message-wrapper";
 import { AppManagement, WebsocketMessageListener } from "../app_management";
 import { $, MyFavouriteDateTimeFormat } from "../utils";
-import { DialogController } from "../dialog_controller";
+import { DialogController } from "./dialog_controller";
 import { Message, RequestJournal, ResponseJournal } from "../flatbuffers_gen/webmanager";
 import * as flatbuffers from 'flatbuffers';
 
@@ -40,6 +40,10 @@ export class ScreenControllerWrapper  implements AppManagement{
     }
     sendWebsocketMessage(data: ArrayBuffer, messageToUnlock?:Array<Message> | undefined, maxWaitingTimeMs?: number | undefined): void {
         return this.parent.sendWebsocketMessage(data, messageToUnlock, maxWaitingTimeMs);
+    }
+
+    log(text:string){
+        return this.parent.log(text);
     }
 }
 

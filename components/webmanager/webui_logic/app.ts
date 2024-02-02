@@ -1,11 +1,11 @@
 import { LiveLogItem, Message } from "./flatbuffers_gen/webmanager";
 import { MessageWrapper} from "./flatbuffers_gen/webmanager/message-wrapper";
 import { AppManagement, WebsocketMessageListener } from "./app_management";
-import { DialogController, Severrity } from "./dialog_controller";
+import { DialogController, Severrity } from "./screen_controller/dialog_controller";
 import { ControllerState, ScreenController, ScreenControllerWrapper, WeblogScreenController } from "./screen_controller/screen_controller";
 import { SystemScreenController } from "./screen_controller/systemscreen_controller";
 import * as flatbuffers from 'flatbuffers';
-import { gel } from "./utils";
+import {$, gel } from "./utils";
 import { WifimanagerController } from "./screen_controller/wifimanager_controller";
 import { WS_URL } from "./constants";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
@@ -30,6 +30,8 @@ class AppController implements AppManagement, WebsocketMessageListener {
   private messageType2listener: Map<number, Array<WebsocketMessageListener>>;
   private messagesToUnlock:Array<Message>=[Message.NONE];
   private modalSpinnerInterval:number=0;
+  private nav_hamburger!: HTMLElement;
+  private nav_ul!: HTMLElement;
 
   public DialogController() { return this.dialogController; };
 
@@ -62,7 +64,13 @@ class AppController implements AppManagement, WebsocketMessageListener {
     let controllerObject=new type(w);
     w.controller=controllerObject;
     this.screenControllers.set(nameInNavAndInMain, w);
-    anchorElement.onclick = (e: MouseEvent) => {e.preventDefault();this.activateScreen(nameInNavAndInMain);};
+    anchorElement.onclick = (e: MouseEvent) => {
+      e.preventDefault();
+      if(this.nav_hamburger.style.display!="none"){
+        //wenn der Hamburger sichtbar ist, dann das geöffnete Menü schließen
+        this.nav_ul.style.display = "none";
+      }
+      this.activateScreen(nameInNavAndInMain);};
     
     return controllerObject;
   }
@@ -101,8 +109,11 @@ class AppController implements AppManagement, WebsocketMessageListener {
       arr.push(listener);
     });
   }
-  
-  private log(message:string){
+  public log(text:string){
+    this.logInternal("I"+text);
+  }
+
+  private logInternal(message:string){
     let msg = document.createElement('p');
     if (message.startsWith("I")) {
       msg.className = 'info';
@@ -111,7 +122,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
     } else {
       msg.className = 'error';
     }
-    msg.innerHTML = message.replace(ANSI_ESCAPE, "");
+    msg.innerText = message.replace(ANSI_ESCAPE, "");
     this.scroller.insertBefore(msg, this.anchor);
     this.messageCount++;
     if (this.messageCount > MAX_MESSAGE_COUNT) {
@@ -149,7 +160,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
 
   onMessage(messageWrapper: MessageWrapper): void {
     let li=<LiveLogItem>messageWrapper.message(new LiveLogItem());
-    this.log(<string>li.text());
+    this.logInternal(<string>li.text());
   }
 
   public async startup() {
@@ -161,6 +172,19 @@ class AppController implements AppManagement, WebsocketMessageListener {
     this.timeseriesScreenController = <TimeseriesController>this.AddScreenController("timeseries", TimeseriesController);
     this.dialogController.init();
     this.activateScreen("");
+    
+    this.nav_ul=$("nav>ul");
+    this.nav_hamburger =$("nav>a");
+    $("nav>a").onclick=(e)=>{
+      if (this.nav_ul.style.display === "block") {
+        this.nav_ul.style.display = "none";
+      } else {
+        this.nav_ul.style.display = "block";
+      }
+      e.preventDefault();
+    }
+    
+    
     try {
       console.log(`Connecting to ${WS_URL}`);
       this.socket = new WebSocket(WS_URL);
@@ -168,7 +192,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
       this.socket.onopen = (event) => {
         console.log('Socket.open');
         this.screenControllers.forEach(w=>w.controller.onCreate());
-        this.activateScreen("home");
+        this.activateScreen("sensact");
       };
       this.socket.onerror = (event: Event) => { console.error('ESocketError'); };
       this.socket.onmessage = (event:MessageEvent<any>) => {this.onWebsocketData(event.data);};

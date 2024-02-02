@@ -1,5 +1,5 @@
 
-import https from "https";
+import https from "node:https";
 import * as fs from "node:fs";
 import * as flatbuffers from 'flatbuffers';
 import { WebSocketServer, WebSocket, RawData } from "ws";

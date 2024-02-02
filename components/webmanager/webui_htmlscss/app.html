@@ -3,6 +3,7 @@
 
 <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0" />
     <title>WebManager</title>
     <link rel="stylesheet" href="app.css" inline>
     <link rel="icon" type="image/png"
@@ -102,9 +103,9 @@
             <li><a href="#" data-nav="wifimanager"><span>📶</span><span>Wifi Manager</span></a></li>
             <li><a href="#" data-nav="timeseries"><span>📊</span><span>Timeseries</span></a></li>
             <li><a href="#" data-nav="systemsettings"><span>&#9881;</span> <span>System Settings</span> </a></li>
-            
             <li><a href="#" data-nav="usersettings"><span>&#9000;</span><span>User Settings</span></a></li>
         </ul>
+        <a href="#"><i>≡</i></a>
     </nav>
     <main data-nav="home">
         <div><input id="btnUpdateJournal" type="button" value=" ⟳ Update" /></div>
@@ -169,7 +170,9 @@
             </thead>
             <tbody id="tblParameters"></tbody>
         </table>
-       
+
+        <h1>NFC</h1>
+        <input id="btnNfc" type="button" value="Start NFC" />
         <h1 class="dangerous">Dangerous Zone</h1>
         <h2>Over-the-air Firmware Update</h2>
         <table>

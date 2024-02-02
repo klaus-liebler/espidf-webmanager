@@ -1,7 +1,6 @@
 import { Mac6, RequestJournal, RequestRestart, RequestSystemData, ResponseSystemData } from "../flatbuffers_gen/webmanager";
 import { Message } from "../flatbuffers_gen/webmanager/message";
 import { MessageWrapper } from "../flatbuffers_gen/webmanager/message-wrapper";
-import { findChipModel, findChipFeatures, findPartitionState, findPartitionSubtype } from "../esp32";
 import { gel, MyFavouriteDateTimeFormat } from "../utils";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
@@ -10,17 +9,16 @@ import { UPLOAD_URL } from "../constants";
 
 
 export class SystemScreenController extends ScreenController {
-    private btnUpload = <HTMLInputElement>gel("btnUpload");
-    private btnNfc = <HTMLInputElement>gel("btnNfc");
-    private btnRestart = <HTMLInputElement>gel("btnRestart");
-    private inpOtafile = <HTMLInputElement>gel("inpOtafile");
-    private lblProgress = <HTMLInputElement>gel("lblProgress");
-    private prgbProgress = <HTMLInputElement>gel("prgbProgress");
-    private tblAppPartitions = <HTMLTableSectionElement>gel("tblAppPartitions");
-    private tblDataPartitions = <HTMLTableSectionElement>gel("tblDataPartitions");
-    private tblParameters = <HTMLTableSectionElement>gel("tblParameters");
+    private btnEnrollNewFinger = <HTMLInputElement>gel("btnEnrollNewFinger");
+    private tblKnownFingers = <HTMLTableSectionElement>gel("tblKnownFingers");
+    private tblFingerprintSensorInfo=<HTMLTableSectionElement>gel("tblFingerprintSensorInfo");
 
-    private sendRequestRestart() {
+    //jede Tabellenzeile hat einen Button "Rename" und einen Button "Delete"
+    //im Property-Speicher des ESP32 wird abgelegt, welche Bezeichnung zu welcher internen Nummer gehört
+    //Das Anlegen eines Eintrages findet ausschließlich über die Automatische Nummerierung statt
+    //in der Tabelle wird auch die interne Speichernummer angezeigt
+
+    private sendRequestEnrollNewFinger() {
         let b = new flatbuffers.Builder(1024);
         let n = RequestRestart.createRequestRestart(b);
         let mw = MessageWrapper.createMessageWrapper(b, Message.RequestRestart, n);
@@ -28,7 +26,15 @@ export class SystemScreenController extends ScreenController {
         this.appManagement.sendWebsocketMessage(b.asUint8Array());
     }
 
-    private sendRequestSystemdata() {
+    private sendRequestDeleteFinger(){
+
+    }
+
+    private sendReqestDeleteAllFingers(){
+
+    }
+
+    private sendRequestFingerprintSensorInfo() {
         let b = new flatbuffers.Builder(1024);
         let n = RequestSystemData.createRequestSystemData(b);
         let mw = MessageWrapper.createMessageWrapper(b, Message.RequestSystemData, n);
@@ -36,9 +42,7 @@ export class SystemScreenController extends ScreenController {
         this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Message.ResponseSystemData], 3000);
     }
 
-    partitionString(original: string | null, def: string) {
-        return (original?.charAt(0) == '\0xFF') ? def : original;
-    }
+    
 
     onMessage(messageWrapper: MessageWrapper): void {
         if (messageWrapper.messageType() != Message.ResponseSystemData) {
@@ -93,48 +97,7 @@ export class SystemScreenController extends ScreenController {
         row.insertCell().textContent = value.toString();
     }
 
-    private mac6_2_string(mac: Mac6 | null): string {
-        if (!mac) return "No Mac";
-        return `${mac.v(0)}:${mac.v(1)}:${mac.v(2)}:${mac.v(3)}:${mac.v(4)}:${mac.v(5)}`;
-    }
-
-    private startUpload(e: MouseEvent) {
-        let otafiles = this.inpOtafile!.files!;
-        if (otafiles.length == 0) {
-            this.appManagement.DialogController().showOKDialog(0, "No file selected!");
-            return;
-        }
-
-        this.inpOtafile.disabled = true;
-        this.btnUpload.disabled = true;
-
-        var file = otafiles[0];
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = (e: Event) => {
-            console.info(`onreadystatechange: e:${e}; xhr:${xhr}; xhr.text:${xhr.responseText}; xhr.readyState:${xhr.readyState}`);
-            if (xhr.readyState == 4) {
-                if (xhr.status == 200) {
-                    this.appManagement.DialogController().showOKDialog(Severrity.SUCCESS, xhr.responseText);
-                } else if (xhr.status == 0) {
-                    console.error("Server closed the connection abruptly!");
-                } else {
-                    console.error(" Error!\n" + xhr.responseText);
-                }
-            }
-        };
-
-
-        xhr.upload.onprogress = (e: ProgressEvent) => {
-
-            let percent = (e.loaded / e.total * 100).toFixed(0);
-            this.lblProgress.textContent = "Progress: " + percent + "%";
-            this.prgbProgress.value = percent;
-        };
-        console.log(`Trying to POST ${UPLOAD_URL}`);
-        xhr.open("POST", UPLOAD_URL, true);
-        xhr.send(file);
-
-    }
+   
 
     onCreate(): void {
         this.btnUpload.onclick = (e: MouseEvent) => this.startUpload(e);
@@ -155,13 +118,6 @@ export class SystemScreenController extends ScreenController {
                 }
             };
 
-            this.btnNfc.onclick = async () => {
-                console.log("Scan starting");
-                this.appManagement.log("Scan starting");
-                await ndef.scan();
-                console.log("Scan Returned");
-                this.appManagement.log("Scan Returned");
-            }
         }
         this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseSystemData);
 

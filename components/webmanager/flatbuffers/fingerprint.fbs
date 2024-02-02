@@ -1,0 +1,32 @@
+namespace webmanager;
+
+table RequestEnrollNewFinger{}
+table RequestDeleteFinger{}
+table RequestDeleteAllFingers{}
+table RequestFingerprintSensorInfo{}
+table RequestFingers{}
+
+table Finger{
+    name:string;
+    index:uint16;
+}
+
+table ResponseFingers{
+    fingers:[Finger];
+}
+
+table ResponseEnrollNewFinger{}
+
+table NotifyFingerDetected{
+    name:string;
+    index:uint16;
+}
+
+table ResponseFingerprintSensorInfo{
+    status:uint16; //Status register Contents of system status register 0 2
+    librarySize:uint16;//System identifier code Fixed value: 0x0000 1 2
+    securityLevel:uint8;
+    deviceAddress:uint32;
+    packetSizeCode:uint8;
+    baudTimes9600:uint8;
+}

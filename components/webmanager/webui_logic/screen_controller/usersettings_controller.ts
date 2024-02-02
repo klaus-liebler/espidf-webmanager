@@ -6,7 +6,7 @@ import * as flatbuffers from 'flatbuffers';
 import us from "../usersettings_copied_during_build";
 import { BooleanItem, ConfigGroup, ConfigItemRT, EnumItem, IntegerItem, StringItem, ValueUpdater } from "../usersettings_base";
 import { T } from "../utils";
-import { Severrity } from "../dialog_controller";
+import { Severrity } from "./dialog_controller";
 
 class ConfigGroupRT{
     constructor(public groupKey:string, public saveButton:HTMLInputElement, public updateButton:HTMLInputElement){}

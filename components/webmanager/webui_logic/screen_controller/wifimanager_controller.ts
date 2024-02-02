@@ -1,4 +1,4 @@
-import { Severrity } from "../dialog_controller";
+import { Severrity } from "./dialog_controller";
 import {Message, MessageWrapper, RequestNetworkInformation, RequestWifiConnect, RequestWifiDisconnect, ResponseNetworkInformation, ResponseWifiConnectSuccessful } from "../flatbuffers_gen/webmanager";
 import { ScreenController } from "./screen_controller";
 import { gel, $, gqsa, Html, ip4_2_string } from "../utils";
