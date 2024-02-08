@@ -1,4 +1,5 @@
 #pragma once
+#include <sdkconfig.h>
 #include <cstring>
 #include <ctime>
 #include <algorithm>
@@ -14,6 +15,12 @@
 #include <esp_chip_info.h>
 #include <esp_mac.h>
 #include <esp_wifi.h>
+#ifndef CONFIG_ESP_HTTPS_SERVER_ENABLE
+    #error "Enable HTTPS in menuconfig"
+#endif
+#ifndef CONFIG_HTTPD_WS_SUPPORT
+ #error "Enable Websocket support for HTTPD in menuconfig"
+#endif
 #include <esp_https_server.h>
 #include "esp_tls.h"
 #include <hal/efuse_hal.h>
@@ -165,6 +172,8 @@ namespace webmanager
         int remainingAttempsToConnectAsSTA{0};
         bool initialScanIsActive{false};
         bool scanIsActive{false};
+        MessageReceiver** plugins{nullptr};
+        size_t pluginsLen{0};
 
         M(){}
 
@@ -496,8 +505,8 @@ namespace webmanager
             
             M* myself = M::GetSingleton();
             flatbuffers::FlatBufferBuilder b(256);
-            auto res = CreateLiveLogItemDirect(b, buffer);
-            myself->WrapAndFinishAndSendAsync(b, Message::Message_LiveLogItem, res.Union());
+            auto res = CreateNotifyLiveLogItemDirect(b, buffer);
+            myself->WrapAndFinishAndSendAsync(b, Message::Message_NotifyLiveLogItem, res.Union());
             free(buffer);
             return buffer_len;
         }
@@ -564,8 +573,16 @@ namespace webmanager
             case webmanager::Message::Message_RequestSetUserSettings:
                 this->userSettings->handleRequestSetUserSettings(req, &ws_pkt, mw->message_as_RequestSetUserSettings());
                 break;
-            default:
-                ESP_LOGW(TAG, "Not yet implemented request %d", (int)mw->message_type());
+            default:{
+                if(plugins && pluginsLen>0){
+                    for(int i=0;i<pluginsLen;i++){
+                        MessageReceiver* mr =plugins[i];
+                        mr->provideWebsocketMessage(this, req, &ws_pkt, mw);
+                    }
+                }
+                ESP_LOGW(TAG, "Not yet implemented request %d, neither internal nor in a plugin", (int)mw->message_type());
+            }
+                
                 break;
             }
             delete[] buf;
@@ -833,6 +850,11 @@ namespace webmanager
             myself->LogJournal(messagecodes::C::SNTP, esp_timer_get_time() / 1000);
         }
 
+        void SetPlugins(MessageReceiver** plugins, size_t pluginsLen){
+            this->plugins=plugins;
+            this->pluginsLen=pluginsLen;
+        }
+        
         void RegisterHTTPDHandlers(httpd_handle_t httpd_handle)
         {
             httpd_uri_t webmanager_get = {"/webmanager", HTTP_GET, handle_webmanager_get_static, this, false, false, nullptr};

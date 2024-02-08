@@ -1,4 +1,4 @@
-import { LiveLogItem, Message } from "./flatbuffers_gen/webmanager";
+import { NotifyLiveLogItem, Message } from "./flatbuffers_gen/webmanager";
 import { MessageWrapper} from "./flatbuffers_gen/webmanager/message-wrapper";
 import { AppManagement, WebsocketMessageListener } from "./app_management";
 import { DialogController, Severrity } from "./screen_controller/dialog_controller";
@@ -10,7 +10,8 @@ import { WifimanagerController } from "./screen_controller/wifimanager_controlle
 import { WS_URL } from "./constants";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
 import { TimeseriesController } from "./screen_controller/timeseries_controller";
-import { SensactScreenController } from "./screen_controller/sensact_controller";
+import { FingerprintScreenController } from "./screen_controller/fingerprint_controller";
+//import { SensactScreenController } from "./screen_controller/sensact_controller";
 
 const ANSI_ESCAPE = new RegExp("(\\x9B|\\x1B\\[)[0-?]*[ -\\/]*[@-~]");
 const MAX_MESSAGE_COUNT = 20;
@@ -36,6 +37,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
   public DialogController() { return this.dialogController; };
 
   private activateScreen(screenNameToActivate:string){
+    var howManyActivated=0;
     this.screenControllers.forEach((wrapper, name) => {
       if (name == screenNameToActivate) {
         wrapper.element.style.display = "block";
@@ -47,6 +49,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
           wrapper.controller.onRestart();
           wrapper.state = ControllerState.STARTED;
         }
+        howManyActivated++;
       } else {
         wrapper.element.style.display = "none";
         if (wrapper.state == ControllerState.STARTED) {
@@ -55,6 +58,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
         }
       }
     });
+    console.info(`We activated ${howManyActivated} screens.`);
   }
 
   public AddScreenController<T extends ScreenController>(nameInNavAndInMain: string, type: { new(m:AppManagement): T ;}):ScreenController {
@@ -66,7 +70,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
     this.screenControllers.set(nameInNavAndInMain, w);
     anchorElement.onclick = (e: MouseEvent) => {
       e.preventDefault();
-      if(this.nav_hamburger.style.display!="none"){
+      if(this.nav_hamburger.style.display==="block"){
         //wenn der Hamburger sichtbar ist, dann das geöffnete Menü schließen
         this.nav_ul.style.display = "none";
       }
@@ -80,7 +84,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
     this.messageType2listener = new Map<number, [WebsocketMessageListener]>;
     this.dialogController = new DialogController(this);
     
-    this.registerWebsocketMessageTypes(this, Message.LiveLogItem);
+    this.registerWebsocketMessageTypes(this, Message.NotifyLiveLogItem);
   }
   MainElement(): HTMLElement {
     throw new Error("May not be called");
@@ -159,23 +163,23 @@ class AppController implements AppManagement, WebsocketMessageListener {
   }
 
   onMessage(messageWrapper: MessageWrapper): void {
-    let li=<LiveLogItem>messageWrapper.message(new LiveLogItem());
+    let li=<NotifyLiveLogItem>messageWrapper.message(new NotifyLiveLogItem());
     this.logInternal(<string>li.text());
   }
 
   public async startup() {
     this.AddScreenController("home", WeblogScreenController);
-    this.AddScreenController("sensact", SensactScreenController)
+    //this.AddScreenController("sensact", SensactScreenController)
     this.AddScreenController("wifimanager", WifimanagerController);
     this.AddScreenController("systemsettings", SystemScreenController);
     this.AddScreenController("usersettings", UsersettingsController);
+    this.AddScreenController("fingerprint", FingerprintScreenController);
     this.timeseriesScreenController = <TimeseriesController>this.AddScreenController("timeseries", TimeseriesController);
     this.dialogController.init();
-    this.activateScreen("");
     
-    this.nav_ul=$("nav>ul");
-    this.nav_hamburger =$("nav>a");
-    $("nav>a").onclick=(e)=>{
+    this.nav_ul=$("nav>ul")!;
+    this.nav_hamburger =$("nav>a")!;
+    this.nav_hamburger.onclick=(e)=>{
       if (this.nav_ul.style.display === "block") {
         this.nav_ul.style.display = "none";
       } else {
@@ -192,7 +196,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
       this.socket.onopen = (event) => {
         console.log('Socket.open');
         this.screenControllers.forEach(w=>w.controller.onCreate());
-        this.activateScreen("sensact");
+        this.activateScreen("home");
       };
       this.socket.onerror = (event: Event) => { console.error('ESocketError'); };
       this.socket.onmessage = (event:MessageEvent<any>) => {this.onWebsocketData(event.data);};

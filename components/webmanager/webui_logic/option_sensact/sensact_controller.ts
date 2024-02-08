@@ -1,8 +1,8 @@
 import { Message } from "../flatbuffers_gen/webmanager/message";
 import { MessageWrapper } from "../flatbuffers_gen/webmanager/message-wrapper";
-import { ScreenController } from "./screen_controller";
-import BuildApps from "../sensactapps_copied_during_build";
-import { ApplicationGroup, SensactApplication } from "../sensactapps_base";
+import { ScreenController } from "../screen_controller/screen_controller";
+import BuildApps from "./sensactapps_copied_during_build";
+import { ApplicationGroup, SensactApplication } from "./sensactapps_base";
 
 
 export class SensactScreenController extends ScreenController {

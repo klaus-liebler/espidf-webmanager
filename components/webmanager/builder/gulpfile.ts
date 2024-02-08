@@ -1,13 +1,23 @@
 const debug = true;
 
 
-const hostnamePrefix = "esp32host_";
+const esp32HostnamePrefix = "esp32host_";
 
 
 
 /*
-//Build is complex
-1.) Only once!: Call gulp rootCA (creates a root certificate+private key rootCA.cert.crt+rootCA.privkey in this directory)
+install typescript globally
+install gulp-cli globally
+execute "gulp" in ESP_IDF console (that points to the right python environment)
+
+Um Sensact in der WebUI zu aktivieren/deaktivieren:
+- webui_logic/app.ts ->passend ein- und auskommentieren in der startup()-Methode
+- builder/gulpfile_config.ts ->OPTION_SENSACT o.ä passend setzen
+- flatbuffers/app.fbs -> includes passen ein- und auskommentieren und im "union Message" ebenfalls passend ein- und auskommentieren
+- Hinweis: Keine Veränderungen im HTML/SCSS-Bereich - dort bleibt derzeit immer alles "drin"
+
+Build is complex
+1.) Only once!: Call gulp rootCA (creates a root certificate+private key rootCA.pem.crt+rootCA.pem.privkey in this directory)
 2.) Only once!: Install rootCA certificate in Windows
   - right click on file rootCA.cert.crt
   - choose "Install Certificate"
@@ -15,7 +25,7 @@ const hostnamePrefix = "esp32host_";
   - Select "Alle Zertifikate in folgendem Speicher speichern"
   - Click "Durchsuchen"
   - Select "Vertrauenswürdige Stammzertifizierungsstellen"
-3.) Edit settings above (hostname is relevant for correct creation of host certificate)
+3.) Edit settings above in this file ("hostname" is relevant for correct creation of host certificate for esp32)
 4.) Edit usersettings/usersettings.ts
 5.) Call gulp (among various other things, the rootCA certificate and its private key are read in and used to create/sign a host certificate)
 6.) Build esp-idf project
@@ -45,7 +55,7 @@ import { inlineSource } from 'inline-source';
 import * as sass from "sass";
 import * as htmlMinifier from "html-minifier";
 import * as cert from "./certificates"
-import { getMac } from "./esp32";
+import { getMac } from "./esp32/esp32";
 import * as part from "./esp32/partition_parser"
 import { DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, DEST_FLATBUFFERS_TYPESCRIPT_WEBUI, DEST_USERSETTINGS_PATH, GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_PATH, GENERATED_FLATBUFFERS_CPP, FLATBUFFERS_SCHEMA_PATH, GENERATED_FLATBUFFERS_TS, WEBUI_TYPESCRIPT_MAIN_FILE_PATH, WEBUI_TSCONFIG_PATH, DIST_WEBUI_RAW, WEBUI_HTMLSCSS_PATH, SCSS_SPA_FILE, HTML_SPA_FILE, DIST_WEBUI_BUNDELED, DIST_WEBUI_COMPRESSED, HTML_SPA_FILE_BROTLI, GENERATED_CERTIFICATES, ROOT_CA_PEM_CRT, ROOT_CA_PEM_PRVTKEY, HOST_CERT_PEM_CRT, HOST_CERT_PEM_PRVTKEY, TESTSERVER_CERT_PEM_CRT, TESTSERVER_CERT_PEM_PRVTKEY, NVS_PART_TOOL } from "./paths";
 import * as snsct from "./gulpfile_sensact"
@@ -182,7 +192,7 @@ exports.build = gulp.series(
   }
   
   exports.getmac = async (cb: gulp.TaskFunctionCallback) => {
-    return getMac(COM_PORT, hostnamePrefix);
+    return getMac(COM_PORT, esp32HostnamePrefix);
   }
   
   exports.parsepart = async (cb: gulp.TaskFunctionCallback) => {

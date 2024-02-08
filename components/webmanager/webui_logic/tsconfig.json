@@ -11,5 +11,8 @@
         "flatbuffers": ["./flatbuffers/flatbuffers.ts"]
       }
     },
-    "exclude": ["templates"]
+    "exclude": [
+      "option_sensact/templates/*.ts",
+      "option_sensact"
+    ]
   }

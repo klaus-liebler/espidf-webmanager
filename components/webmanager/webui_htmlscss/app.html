@@ -104,6 +104,7 @@
             <li><a href="#" data-nav="timeseries"><span>📊</span><span>Timeseries</span></a></li>
             <li><a href="#" data-nav="systemsettings"><span>&#9881;</span> <span>System Settings</span> </a></li>
             <li><a href="#" data-nav="usersettings"><span>&#9000;</span><span>User Settings</span></a></li>
+            <li><a href="#" data-nav="fingerprint"><span>&#128073;</span><span>Fingerprint</span></a></li>
         </ul>
         <a href="#"><i>≡</i></a>
     </nav>
@@ -281,6 +282,40 @@
 
             </thead>
             <tbody id="tblAccessPointList"></tbody>
+        </table>
+    </main>
+    <main data-nav="fingerprint">
+
+        <h1>Current Fingers</h1>
+        <div class="buttons">
+            <input id="btnUpdateFingers" type="button" value="Update" />
+            <input id="btnFingerprintEnroll" type="button" value="Enroll" />
+            <input id="btnDeleteAll" type="button" value="Delete All" />
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Index</th>
+                    <th>Actions</th>
+                </tr>
+
+            </thead>
+            <tbody id="tblFingers"></tbody>
+        </table>
+        
+        <h1>Fingerprint Sensor</h1>
+        <div class="buttons">
+            <input id="btnFingerprintGetSensorInfo" type="button" value="Get Sensor Info" />
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Property</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody id="tblFingerprintSensorInfo"></tbody>
         </table>
     </main>
     <footer>

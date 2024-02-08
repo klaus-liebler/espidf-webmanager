@@ -1,9 +1,52 @@
 namespace webmanager;
 
-table RequestEnrollNewFinger{}
-table RequestDeleteFinger{}
+table RequestEnrollNewFinger{
+    name:string;
+}
+table ResponseEnrollNewFinger{
+    started:bool;
+}
+table NotifyEnrollNewFinger{
+    name:string;
+    index:uint16;
+    step:uint8;
+    errorcode:uint8;
+}
+
+table RequestDeleteFinger{
+    name:string;
+}
+table ResponseDeleteFinger{
+    success:bool;
+    name:string;
+}
+
 table RequestDeleteAllFingers{}
+table ResponseDeleteAllFingers{
+    success:bool;
+}
+
+table RequestRenameFinger{
+    old_name:string;
+    new_name:string;
+}
+table ResponseRenameFinger{
+    success:bool;
+}
+
 table RequestFingerprintSensorInfo{}
+table ResponseFingerprintSensorInfo{
+    status:uint16; //Status register Contents of system status register 0 2
+    librarySize:uint16;//System identifier code Fixed value: 0x0000 1 2
+    securityLevel:uint8;
+    deviceAddress:uint32;
+    dataPacketSizeCode:uint8;
+    baudRateTimes9600:uint8;
+    algVer:string;
+    fwVer:string;
+}
+
+
 table RequestFingers{}
 
 table Finger{
@@ -15,18 +58,12 @@ table ResponseFingers{
     fingers:[Finger];
 }
 
-table ResponseEnrollNewFinger{}
 
 table NotifyFingerDetected{
-    name:string;
+    //name:string; no, name is unknown; browser has to find out it
+    success:bool;
     index:uint16;
+    score:uint8;
 }
 
-table ResponseFingerprintSensorInfo{
-    status:uint16; //Status register Contents of system status register 0 2
-    librarySize:uint16;//System identifier code Fixed value: 0x0000 1 2
-    securityLevel:uint8;
-    deviceAddress:uint32;
-    packetSizeCode:uint8;
-    baudTimes9600:uint8;
-}
+

@@ -8,9 +8,9 @@ import { Message } from "./flatbuffers_gen/webmanager/message";
 import { ResponseSystemData } from "./flatbuffers_gen/webmanager/response-system-data";
 import { PartitionInfo } from "./flatbuffers_gen/webmanager/partition-info";
 import { Mac6, } from "./flatbuffers_gen/webmanager/mac6";
-import { LiveLogItem } from "./flatbuffers_gen/webmanager/live-log-item";
+import { NotifyLiveLogItem } from "./flatbuffers_gen/webmanager/notify-live-log-item";
 import { AccessPoint } from "./flatbuffers_gen/webmanager/access-point";
-import { BooleanSetting, EnumSetting, IntegerSetting, JournalItem, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./flatbuffers_gen/webmanager";
+import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./flatbuffers_gen/webmanager";
 import { createTimeseries } from "./timeseries_generator";
 
 
@@ -46,6 +46,28 @@ function sendResponseSystemData(ws: WebSocket) {
     ResponseSystemData.addSecondsUptime(b, BigInt(10));
     let rsd = ResponseSystemData.endResponseSystemData(b);
     b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseSystemData, rsd));
+    ws.send(b.asUint8Array());
+}
+
+function sendResponseFingerprintSensorInfo(ws: WebSocket) {
+    let b = new flatbuffers.Builder(1024);
+    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseFingerprintSensorInfo,
+        ResponseFingerprintSensorInfo.createResponseFingerprintSensorInfo(b, 42, 43, 3, 0x55AA55AA, 1, 6, b.createString("algVer"), b.createString("fwVer"))
+        ));
+    ws.send(b.asUint8Array());
+}
+
+
+function sendResponseFingers(ws: WebSocket) {
+    let b = new flatbuffers.Builder(1024);
+    let fingersOffset = ResponseFingers.createFingersVector(b, [
+        Finger.createFinger(b, b.createString("Klaus rechts mitte"), 1),
+        Finger.createFinger(b, b.createString("Steffi links mitte"), 2)
+
+    ]);
+    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseFingers,
+        ResponseFingers.createResponseFingers(b, fingersOffset)
+        ));
     ws.send(b.asUint8Array());
 }
 
@@ -169,9 +191,17 @@ function process(buffer: Buffer, ws: WebSocket) {
             break;
         case Message.RequestTimeseries:
             setTimeout(()=>{sendResponseTimeseries(ws, <RequestTimeseries>mw.message(new RequestTimeseries())), 200});
+            break;
         case Message.RequestWifiConnect:{
             setTimeout(()=>{sendResponseWifiConnectionSuccessOrFailed(ws, <RequestWifiConnect>mw.message(new RequestWifiConnect()));}, 3000);
+            break;
         }
+        case Message.RequestFingerprintSensorInfo:
+            setTimeout(()=>sendResponseFingerprintSensorInfo(ws), 100);
+            break;
+        case Message.RequestFingers:
+            setTimeout(()=>sendResponseFingers(ws), 100);
+
         default:
             break;
     }
@@ -233,10 +263,10 @@ server.listen(PORT, () => {
         switch (messageChanger) {
             case 0:
                 let text = b.createString(`Dies ist eine Meldung ${new Date().getTime()}`);
-                LiveLogItem.startLiveLogItem(b);
-                LiveLogItem.addText(b, text);
-                let li = LiveLogItem.endLiveLogItem(b);
-                mw = MessageWrapper.createMessageWrapper(b, Message.LiveLogItem, li);
+                NotifyLiveLogItem.startNotifyLiveLogItem(b);
+                NotifyLiveLogItem.addText(b, text);
+                let li = NotifyLiveLogItem.endNotifyLiveLogItem(b);
+                mw = MessageWrapper.createMessageWrapper(b, Message.NotifyLiveLogItem, li);
                 b.finish(mw);
                 //wss.clients.forEach(ws => ws.send(b.asUint8Array()));
                 break;

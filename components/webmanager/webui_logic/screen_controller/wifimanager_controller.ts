@@ -42,11 +42,7 @@ export class WifimanagerController extends ScreenController {
     }
 
     onCreate(): void {
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseNetworkInformation);
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseWifiConnectFailed);
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseWifiConnectSuccessful);
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseWifiDisconnect);
-
+        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseNetworkInformation, Message.ResponseWifiConnectFailed ,Message.ResponseWifiConnectSuccessful, Message.ResponseWifiDisconnect);
         gel("btnWifiShowDetails").onclick = () => this.appManagement.DialogController().showOKDialog(Severrity.INFO, "Das sind die Details", (s) => { });
         gel("btnWifiUpdateList").onclick = () =>{this.sendRequestWifiAccesspoints(false);};
         gel("btnWifiDisconnect").onclick=()=> this.appManagement.DialogController().showOKCancelDialog(Severrity.WARN, "Möchten Sie wirklich die bestehende Verbindung trennen und damit auch vom ESP32 löschen?", (ok) => {if(ok) this.sendRequestWifiDisconnect();});
