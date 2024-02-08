@@ -501,7 +501,7 @@ namespace fingerprint
             c.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
             c.source_clk = UART_SCLK_DEFAULT;
 
-            ESP_ERROR_CHECK(uart_driver_install(uart_num, 64, 0, 1, nullptr, 0));
+            ESP_ERROR_CHECK(uart_driver_install(uart_num, 256, 0, 1, nullptr, 0));
             ESP_ERROR_CHECK(uart_param_config(uart_num, &c));
             ESP_ERROR_CHECK(uart_set_pin(uart_num, (int)txd, (int)rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
             ESP_ERROR_CHECK(uart_flush(uart_num));
@@ -558,6 +558,7 @@ namespace fingerprint
             RETURN_ON_ERROR(nvs_erase_key(this->nvsHandle, oldName));
             RETURN_ON_ERROR(nvs_set_u16(this->nvsHandle, newName, fingerIndex));
             RETURN_ON_ERROR(nvs_commit(this->nvsHandle));
+            return ESP_OK;
         }
 
         esp_err_t TryDelete(const char* name){
@@ -567,6 +568,7 @@ namespace fingerprint
             DeleteChar(fingerIndex);
             RETURN_ON_ERROR(nvs_erase_key(this->nvsHandle, name));
             RETURN_ON_ERROR(nvs_commit(this->nvsHandle));
+            return ESP_OK;
         }
 
         esp_err_t TryDeleteAll(){
@@ -574,6 +576,7 @@ namespace fingerprint
             if(EmptyLibrary()!=RET::OK) return ESP_FAIL;
             RETURN_ON_ERROR(nvs_erase_all(this->nvsHandle));
             RETURN_ON_ERROR(nvs_commit(this->nvsHandle));
+            return ESP_OK;
         }
     };
 

@@ -132,8 +132,8 @@ class Webmanager2Fingerprint2Hardware:public MessageReceiver, public fingerprint
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Message::Message_ResponseFingers, 
                 webmanager::CreateResponseFingersDirect(b, &fingers_vector).Union());
         }
-            
-            break;
+        default:   
+            return ESP_OK;
         }
     }
 };

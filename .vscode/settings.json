@@ -68,5 +68,7 @@
     "thread": "cpp",
     "cinttypes": "cpp",
     "typeinfo": "cpp"
-  }
+  },
+  "idf.flashType": "UART",
+  "idf.portWin": "COM17"
 }
