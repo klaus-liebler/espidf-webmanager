@@ -156,7 +156,7 @@ namespace webmanager
             nvs_close(nvs_handle);
             
             auto resp = CreateResponseSetUserSettingsDirect(b, groupKey, &keys_vector);
-            messageSender->WrapAndFinishAndSendAsync(b, webmanager::Message_ResponseSetUserSettings, resp.Union());
+            messageSender->WrapAndFinishAndSendAsync(b, webmanager::Responses_ResponseSetUserSettings, resp.Union());
             return ESP_OK;
         }
 
@@ -277,7 +277,7 @@ namespace webmanager
             // Close
             nvs_close(nvs_handle);
             auto resp = CreateResponseGetUserSettingsDirect(b, groupKey, &sw_vector);
-            messageSender->WrapAndFinishAndSendAsync(b, webmanager::Message_ResponseGetUserSettings, resp.Union());
+            messageSender->WrapAndFinishAndSendAsync(b, webmanager::Responses_ResponseGetUserSettings, resp.Union());
             return ESP_OK;
         }
     };

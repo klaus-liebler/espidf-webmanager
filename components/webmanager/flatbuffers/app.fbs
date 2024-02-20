@@ -4,6 +4,7 @@ include "usersettings.fbs";
 include "timeseries.fbs";
 //include "websensact.fbs";
 include "fingerprint.fbs";
+include "canmonitor.fbs";
 
 namespace webmanager;
 
@@ -24,48 +25,58 @@ table ResponseJournal{
 table NotifyLiveLogItem{
     text:string;
 }
-
-union Message{
+union Responses{
+    NotifyCanMessage,
     NotifyLiveLogItem, 
-    RequestNetworkInformation, 
     ResponseNetworkInformation, 
-    RequestWifiConnect, 
     ResponseWifiConnectSuccessful, 
     ResponseWifiConnectFailed, 
-    RequestWifiDisconnect, 
     ResponseWifiDisconnect, 
-    RequestSystemData, 
     ResponseSystemData, 
-    RequestJournal, 
     ResponseJournal, 
-    RequestRestart, 
-    RequestGetUserSettings, 
     ResponseGetUserSettings, 
-    RequestSetUserSettings, 
     ResponseSetUserSettings,
-    RequestTimeseries,
     ResponseTimeseriesDummy,
-//fingerprint start   
-    RequestEnrollNewFinger,
+//fingerprint start 
     ResponseEnrollNewFinger,
     NotifyEnrollNewFinger,
     NotifyFingerDetected,
-    RequestDeleteFinger,
     ResponseDeleteFinger,
-    RequestDeleteAllFingers,
-    ResponseDeleteAllFingers,
-    RequestRenameFinger,
     ResponseRenameFinger,
-    RequestFingerprintSensorInfo,
     ResponseFingerprintSensorInfo,
-    RequestFingers,
+    ResponseDeleteAllFingers,
     ResponseFingers,
+    ResponseCancelInstruction,
+//fingerprint end
+}
+
+union Requests{
+    RequestNetworkInformation, 
+    RequestWifiConnect, 
+    RequestWifiDisconnect, 
+    RequestSystemData, 
+    RequestJournal, 
+    RequestRestart, 
+    RequestGetUserSettings, 
+    RequestSetUserSettings, 
+    RequestTimeseries,
+//fingerprint start 
+    RequestOpenDoor,
+    RequestEnrollNewFinger,
+    RequestDeleteFinger,
+    RequestDeleteAllFingers,
+    RequestRenameFinger,
+    RequestFingerprintSensorInfo,
+    RequestFingers,
+    RequestCancelInstruction,
 //fingerprint end
     }
 
 
-table MessageWrapper{
-    message:Message;
+table RequestWrapper{
+    request:Requests;
 }
 
-root_type MessageWrapper;
+table ResponseWrapper{
+    response:Responses;
+}

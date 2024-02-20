@@ -15,12 +15,6 @@
 #include <esp_chip_info.h>
 #include <esp_mac.h>
 #include <esp_wifi.h>
-#ifndef CONFIG_ESP_HTTPS_SERVER_ENABLE
-    #error "Enable HTTPS in menuconfig"
-#endif
-#ifndef CONFIG_HTTPD_WS_SUPPORT
- #error "Enable Websocket support for HTTPD in menuconfig"
-#endif
 #include <esp_https_server.h>
 #include "esp_tls.h"
 #include <hal/efuse_hal.h>
@@ -43,6 +37,16 @@
 #include "../generated/flatbuffers_gen_cpp/app_generated.h"
 #include "interfaces.hh"
 #include "user_settings.hh"
+
+#if (CONFIG_HTTPD_MAX_REQ_HDR_LEN<1024)
+    #error CONFIG_HTTPD_MAX_REQ_HDR_LEN<1024
+#endif
+#ifndef CONFIG_ESP_HTTPS_SERVER_ENABLE
+    #error "Enable HTTPS in menuconfig"
+#endif
+#ifndef CONFIG_HTTPD_WS_SUPPORT
+ #error "Enable Websocket support for HTTPD in menuconfig"
+#endif
 
 #define TAG "WMAN"
 #define WLOG(mc, md) webmanager::M::GetSingleton()->Log(mc, md)
@@ -373,9 +377,9 @@ namespace webmanager
                         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
                         esp_wifi_scan_start(&scan_config, false);
                         scanIsActive=true;
-                        flatbuffers::FlatBufferBuilder b(1024);
+                        flatbuffers::FlatBufferBuilder b(256);
                         auto res = CreateResponseWifiConnectFailedDirect(b, (char*)wifi_config_sta.sta.ssid);
-                        WrapAndFinishAndSendAsync(b, Message::Message_ResponseWifiConnectFailed, res.Union());
+                        WrapAndFinishAndSendAsync(b, Responses::Responses_ResponseWifiConnectFailed, res.Union());
                     }
                     else
                     {
@@ -455,9 +459,9 @@ namespace webmanager
                 if(http_server){
                     wifi_ap_record_t ap = {};
                     esp_wifi_sta_get_ap_info(&ap);
-                    flatbuffers::FlatBufferBuilder b(1024);
+                    flatbuffers::FlatBufferBuilder b(256);
                     auto res =  CreateResponseWifiConnectSuccessfulDirect(b, (char*)wifi_config_sta.sta.ssid, event->ip_info.ip.addr, event->ip_info.netmask.addr, event->ip_info.gw.addr);
-                    WrapAndFinishAndSendAsync(b, Message::Message_ResponseWifiConnectSuccessful, res.Union());
+                    WrapAndFinishAndSendAsync(b, Responses::Responses_ResponseWifiConnectSuccessful, res.Union());
                 }
                 break;
             }
@@ -502,11 +506,13 @@ namespace webmanager
                 return buffer_len;
             }    
             printf(buffer);
-            
+            free(buffer);
+            return buffer_len;
+            //TODO: system crashes without message after connection to access point
             M* myself = M::GetSingleton();
             flatbuffers::FlatBufferBuilder b(256);
             auto res = CreateNotifyLiveLogItemDirect(b, buffer);
-            myself->WrapAndFinishAndSendAsync(b, Message::Message_NotifyLiveLogItem, res.Union());
+            myself->WrapAndFinishAndSendAsync(b, Responses::Responses_NotifyLiveLogItem, res.Union());
             free(buffer);
             return buffer_len;
         }
@@ -539,48 +545,55 @@ namespace webmanager
             assert(buf);
             ws_pkt.payload = buf;
             esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
-            ESP_LOGI(TAG, "frame len is %d, frame type is %d", ws_pkt.len, ws_pkt.type);
+            
             if (ret != ESP_OK)
             {
                 ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
                 delete[] buf;
                 return ret;
             }
-            auto mw = GetMessageWrapper(buf);
-            switch (mw->message_type())
+            auto mw = flatbuffers::GetRoot<RequestWrapper>(buf);
+            webmanager::Requests reqType=mw->request_type();
+            ESP_LOGI(TAG, "Received websocket frame: len=%d, requestType=%d ", (int)ws_pkt.len, reqType);
+            switch (reqType)
             {
-            case webmanager::Message::Message_RequestSystemData:
+            case webmanager::Requests::Requests_RequestSystemData:
                 sendResponseSystemData(req, &ws_pkt);
                 break;
-            case webmanager::Message::Message_RequestJournal:
+            case webmanager::Requests::Requests_RequestJournal:
                 sendResponseJournal(req, &ws_pkt);
                 break;
-            case webmanager::Message::Message_RequestNetworkInformation:
-                sendResponseNetworkInformation(req, &ws_pkt, mw->message_as_RequestNetworkInformation());
+            case webmanager::Requests::Requests_RequestNetworkInformation:
+                sendResponseNetworkInformation(req, &ws_pkt, mw->request_as_RequestNetworkInformation());
                 break;
-            case webmanager::Message::Message_RequestRestart:
+            case webmanager::Requests::Requests_RequestRestart:
                 esp_restart();
                 break;
-            case webmanager::Message::Message_RequestWifiConnect:
-                handleRequestWifiConnect(req, &ws_pkt, mw->message_as_RequestWifiConnect());
+            case webmanager::Requests::Requests_RequestWifiConnect:
+                handleRequestWifiConnect(req, &ws_pkt, mw->request_as_RequestWifiConnect());
                 break;
-            case webmanager::Message::Message_RequestWifiDisconnect:
-                handleRequestWifiDisconnect(req, &ws_pkt, mw->message_as_RequestWifiDisconnect());
+            case webmanager::Requests::Requests_RequestWifiDisconnect:
+                handleRequestWifiDisconnect(req, &ws_pkt, mw->request_as_RequestWifiDisconnect());
                 break;
-            case webmanager::Message::Message_RequestGetUserSettings:
-                this->userSettings->handleRequestGetUserSettings(req, &ws_pkt, mw->message_as_RequestGetUserSettings());
+            case webmanager::Requests::Requests_RequestGetUserSettings:
+                this->userSettings->handleRequestGetUserSettings(req, &ws_pkt, mw->request_as_RequestGetUserSettings());
                 break;
-            case webmanager::Message::Message_RequestSetUserSettings:
-                this->userSettings->handleRequestSetUserSettings(req, &ws_pkt, mw->message_as_RequestSetUserSettings());
+            case webmanager::Requests::Requests_RequestSetUserSettings:
+                this->userSettings->handleRequestSetUserSettings(req, &ws_pkt, mw->request_as_RequestSetUserSettings());
                 break;
             default:{
+                bool success{false};
                 if(plugins && pluginsLen>0){
                     for(int i=0;i<pluginsLen;i++){
                         MessageReceiver* mr =plugins[i];
-                        mr->provideWebsocketMessage(this, req, &ws_pkt, mw);
+                        if(mr->provideWebsocketMessage(this, req, &ws_pkt, mw)==ESP_OK){
+                            success=true;
+                        }
                     }
                 }
-                ESP_LOGW(TAG, "Not yet implemented request %d, neither internal nor in a plugin", (int)mw->message_type());
+                if(!success){
+                    ESP_LOGW(TAG, "Not yet implemented request %d, neither internal nor in a plugin", (int)mw->request_type());
+                }
             }
                 
                 break;
@@ -606,15 +619,15 @@ namespace webmanager
             connectAsSTA();
             return ret;
         negativeresponse:
-            flatbuffers::FlatBufferBuilder b(1024);
+            flatbuffers::FlatBufferBuilder b(256);
             auto res =  CreateResponseWifiConnectFailedDirect(b, (char*)wifi_config_sta.sta.ssid);
-            return WrapAndFinishAndSendAsync(b, Message::Message_ResponseWifiConnectFailed, res.Union());
+            return WrapAndFinishAndSendAsync(b, Responses::Responses_ResponseWifiConnectFailed, res.Union());
         }
 
         esp_err_t handleRequestWifiDisconnect(httpd_req_t *req, httpd_ws_frame_t *ws_pkt, const webmanager::RequestWifiDisconnect *wifiDisconnect){
-            flatbuffers::FlatBufferBuilder b(1024);
+            flatbuffers::FlatBufferBuilder b(256);
             auto res =  CreateResponseWifiDisconnect(b);
-            auto mwresp=CreateMessageWrapper(b, Message::Message_ResponseWifiDisconnect, res.Union());
+            auto mwresp= CreateResponseWrapper(b, Responses::Responses_ResponseWifiDisconnect, res.Union());
             b.Finish(mwresp);
             AsyncResponse *a = new AsyncResponse(&b);
             if(httpd_queue_work(http_server, M::ws_async_send, a)!=ESP_OK){delete(a);}
@@ -673,7 +686,7 @@ namespace webmanager
                 sta_ip_info.gw.addr,
                 ap.rssi,
                 &ap_vector);
-            return WrapAndFinishAndSendAsync(b, Message::Message_ResponseNetworkInformation, res.Union());
+            return WrapAndFinishAndSendAsync(b, Responses::Responses_ResponseNetworkInformation, res.Union());
         }
         
         esp_err_t sendResponseJournal(httpd_req_t *req, httpd_ws_frame_t *ws_pkt)
@@ -694,7 +707,7 @@ namespace webmanager
             xSemaphoreGive(webmanager_semaphore);
             auto rjOffset =  CreateResponseJournal(b, b.CreateVector(item_vector));
 
-            return WrapAndFinishAndSendAsync(b, Message::Message_ResponseJournal, rjOffset.Union());
+            return WrapAndFinishAndSendAsync(b, Responses::Responses_ResponseJournal, rjOffset.Union());
         }
 
         esp_err_t sendResponseSystemData(httpd_req_t *req, httpd_ws_frame_t *ws_pkt)
@@ -742,7 +755,7 @@ namespace webmanager
                 tv_now.tv_sec, esp_timer_get_time()/1000000, esp_get_free_heap_size(), &sta, &softap, &bt, &eth, &ieee,
                 (uint32_t)chip_info.model, chip_info.features, chip_info.revision, chip_info.cores, tsens_out, &partitions_vector
             );
-            return WrapAndFinishAndSendAsync(b, Message::Message_ResponseSystemData, rsd.Union());
+            return WrapAndFinishAndSendAsync(b, Responses::Responses_ResponseSystemData, rsd.Union());
         }
 
         static esp_err_t handle_webmanager_get_static(httpd_req_t *req)
@@ -821,8 +834,8 @@ namespace webmanager
             return this->userSettings;
         }
         
-        esp_err_t WrapAndFinishAndSendAsync(::flatbuffers::FlatBufferBuilder &_fbb, webmanager::Message message_type = webmanager::Message_NONE, ::flatbuffers::Offset<void> message = 0){
-            _fbb.Finish(CreateMessageWrapper(_fbb, message_type, message));
+        esp_err_t WrapAndFinishAndSendAsync(::flatbuffers::FlatBufferBuilder &_fbb, webmanager::Responses message_type = webmanager::Responses_NONE, ::flatbuffers::Offset<void> message = 0){
+            _fbb.Finish(CreateResponseWrapper(_fbb, message_type, message));
             auto *a = new AsyncResponse(&_fbb);
             if(httpd_queue_work(http_server, M::ws_async_send, a)!=ESP_OK){delete(a);}
              return ESP_OK;
@@ -923,7 +936,7 @@ namespace webmanager
 
             //Create usersetting manager
             this->userSettings = new UserSettings("nvs", this);
-            //Forward logging to browser TODO: nachdem das hier auskommentiert war, stürzte das system nicht mehr nach dem AP-connecten ab
+            //Forward logging to browser
             esp_log_set_vprintf(M::logging_vprintf);
 
             wifi_manager_retry_timer = xTimerCreate("retry timer", pdMS_TO_TICKS(WIFI_MANAGER_RETRY_TIMER), pdFALSE, (void *)0, M::webmanager_timer_retry_cb_static);
@@ -973,11 +986,12 @@ namespace webmanager
 
             ESP_ERROR_CHECK(mdns_init());
             ESP_ERROR_CHECK(mdns_hostname_set(hostname));
-            ESP_LOGI(TAG, "mdns hostname set to: [%s]", hostname);
+            ESP_LOGI(TAG, "mdns hostname set to '%s'", hostname);
             const char* MDNS_INSTANCE="SENSACT_MDNS_INSTANCE";
             ESP_ERROR_CHECK(mdns_instance_name_set(MDNS_INSTANCE));
 
-            /* DHCP AP configuration */
+            /* DHCP AP configuration 
+    	    //This seems to be part of the default AccessPoint configuration, at least there is no such code in https://github.com/espressif/esp-idf/blob/release/v5.2/examples/wifi/getting_started/softAP/main/softap_example_main.c
             esp_netif_ip_info_t ap_ip_info = {};
             IP4_ADDR(&ap_ip_info.ip, 192, 168, 210, 0);
             IP4_ADDR(&ap_ip_info.netmask, 255, 255, 255, 0);
@@ -985,10 +999,14 @@ namespace webmanager
             ESP_ERROR_CHECK(esp_netif_dhcps_stop(wifi_netif_ap));
             ESP_ERROR_CHECK(esp_netif_set_ip_info(wifi_netif_ap, &ap_ip_info));
             ESP_ERROR_CHECK(esp_netif_dhcps_start(wifi_netif_ap));
+            */
 
             ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
             ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config_ap));
             ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
+            //turn wifi logging nearly off
+            esp_log_level_set("wifi", ESP_LOG_WARN);
 
             // prepare simple network time protocol client and start it, when we got an IP-Adress (see event handler)
             esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
@@ -1033,7 +1051,7 @@ namespace webmanager
             //temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
             //ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor, &temp_handle));
             //ESP_ERROR_CHECK(temperature_sensor_enable(temp_handle));
-
+            ESP_LOGI(TAG, "Webmanager has been succcessfully initialized");
             return ESP_OK;
         }
 

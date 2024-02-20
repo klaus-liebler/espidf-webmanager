@@ -1,29 +1,46 @@
 namespace webmanager;
 
+table RequestOpenDoor{
+    
+}
+
 table RequestEnrollNewFinger{
     name:string;
 }
 table ResponseEnrollNewFinger{
-    started:bool;
+    errorcode:uint16;
 }
 table NotifyEnrollNewFinger{
     name:string;
     index:uint16;
     step:uint8;
-    errorcode:uint8;
+    errorcode:uint16;
+}
+
+table NotifyFingerDetected{
+    //name:string; no, name is unknown; browser has to find out it!
+    errorcode:uint16;
+    index:uint16;
+    score:uint8;
 }
 
 table RequestDeleteFinger{
     name:string;
 }
 table ResponseDeleteFinger{
-    success:bool;
+    errorcode:uint16;
     name:string;
 }
 
+
 table RequestDeleteAllFingers{}
 table ResponseDeleteAllFingers{
-    success:bool;
+    errorcode:uint16;
+}
+
+table RequestCancelInstruction{}
+table ResponseCancelInstruction{
+    errorcode:uint16;
 }
 
 table RequestRenameFinger{
@@ -31,7 +48,7 @@ table RequestRenameFinger{
     new_name:string;
 }
 table ResponseRenameFinger{
-    success:bool;
+    errorcode:uint16;
 }
 
 table RequestFingerprintSensorInfo{}
@@ -59,11 +76,6 @@ table ResponseFingers{
 }
 
 
-table NotifyFingerDetected{
-    //name:string; no, name is unknown; browser has to find out it
-    success:bool;
-    index:uint16;
-    score:uint8;
-}
+
 
 

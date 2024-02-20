@@ -1,11 +1,9 @@
-import { Mac6, RequestJournal, RequestRestart, RequestSystemData, ResponseSystemData } from "../flatbuffers_gen/webmanager";
-import { Message } from "../flatbuffers_gen/webmanager/message";
-import { MessageWrapper } from "../flatbuffers_gen/webmanager/message-wrapper";
+import { Mac6, RequestRestart, RequestSystemData, RequestWrapper, Requests, ResponseSystemData, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
 import { findChipModel, findChipFeatures, findPartitionState, findPartitionSubtype } from "../esp32";
 import { gel, MyFavouriteDateTimeFormat } from "../utils";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
-import { Severrity } from "./dialog_controller";
+import { Severity } from "./dialog_controller";
 import { UPLOAD_URL } from "../constants";
 
 
@@ -23,7 +21,7 @@ export class SystemScreenController extends ScreenController {
     private sendRequestRestart() {
         let b = new flatbuffers.Builder(1024);
         let n = RequestRestart.createRequestRestart(b);
-        let mw = MessageWrapper.createMessageWrapper(b, Message.RequestRestart, n);
+        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestRestart, n);
         b.finish(mw);
         this.appManagement.sendWebsocketMessage(b.asUint8Array());
     }
@@ -31,20 +29,20 @@ export class SystemScreenController extends ScreenController {
     private sendRequestSystemdata() {
         let b = new flatbuffers.Builder(1024);
         let n = RequestSystemData.createRequestSystemData(b);
-        let mw = MessageWrapper.createMessageWrapper(b, Message.RequestSystemData, n);
+        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestSystemData, n);
         b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Message.ResponseSystemData], 3000);
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseSystemData], 3000);
     }
 
     partitionString(original: string | null, def: string) {
         return (original?.charAt(0) == '\0xFF') ? def : original;
     }
 
-    onMessage(messageWrapper: MessageWrapper): void {
-        if (messageWrapper.messageType() != Message.ResponseSystemData) {
+    onMessage(messageWrapper: ResponseWrapper): void {
+        if (messageWrapper.responseType() != Responses.ResponseSystemData) {
             return;
         }
-        let sd = <ResponseSystemData>messageWrapper.message(new ResponseSystemData());
+        let sd = <ResponseSystemData>messageWrapper.response(new ResponseSystemData());
         this.tblParameters.textContent = "";
 
         let secondsEpoch = sd.secondsEpoch();
@@ -114,7 +112,7 @@ export class SystemScreenController extends ScreenController {
             console.info(`onreadystatechange: e:${e}; xhr:${xhr}; xhr.text:${xhr.responseText}; xhr.readyState:${xhr.readyState}`);
             if (xhr.readyState == 4) {
                 if (xhr.status == 200) {
-                    this.appManagement.DialogController().showOKDialog(Severrity.SUCCESS, xhr.responseText);
+                    this.appManagement.DialogController().showOKDialog(Severity.SUCCESS, xhr.responseText);
                 } else if (xhr.status == 0) {
                     console.error("Server closed the connection abruptly!");
                 } else {
@@ -139,7 +137,7 @@ export class SystemScreenController extends ScreenController {
     onCreate(): void {
         this.btnUpload.onclick = (e: MouseEvent) => this.startUpload(e);
         this.btnRestart.onclick = (e: MouseEvent) => {
-            this.appManagement.DialogController().showOKCancelDialog(Severrity.WARN, "Are you really sure to restart the system", (s) => { if (s) this.sendRequestRestart(); });
+            this.appManagement.DialogController().showOKCancelDialog(Severity.WARN, "Are you really sure to restart the system", (s) => { if (s) this.sendRequestRestart(); });
         };
 
         if (window["NDEFReader"]) {
@@ -163,7 +161,7 @@ export class SystemScreenController extends ScreenController {
                 this.appManagement.log("Scan Returned");
             }
         }
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseSystemData);
+        this.appManagement.registerWebsocketMessageTypes(this, Responses.ResponseSystemData);
 
     }
     onFirstStart(): void {

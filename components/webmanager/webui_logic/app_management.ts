@@ -1,8 +1,8 @@
-import { Message, MessageWrapper } from "./flatbuffers_gen/webmanager";
-import { DialogController } from "./screen_controller/dialog_controller"
+import { ResponseWrapper, Responses } from "./flatbuffers_gen/webmanager";
+import { DialogController, Severity } from "./screen_controller/dialog_controller"
 
 export interface WebsocketMessageListener{
-    onMessage(messageWrapper:MessageWrapper):void;
+    onMessage(messageWrapper:ResponseWrapper):void;
 }
 
 export interface AppManagement
@@ -10,6 +10,7 @@ export interface AppManagement
     DialogController():DialogController;
     MainElement():HTMLElement;
     registerWebsocketMessageTypes(listener: WebsocketMessageListener, ...messageType:number[]):void;
-    sendWebsocketMessage(data:ArrayBuffer, messageToUnlock?:Array<Message>, maxWaitingTimeMs?:number):void;
+    sendWebsocketMessage(data:ArrayBuffer, messageToUnlock?:Array<Responses>, maxWaitingTimeMs?:number):void;
     log(text:string):void;
+    showSnackbar(severity:Severity, text:string):void;
 };

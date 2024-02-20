@@ -105,6 +105,7 @@
             <li><a href="#" data-nav="systemsettings"><span>&#9881;</span> <span>System Settings</span> </a></li>
             <li><a href="#" data-nav="usersettings"><span>&#9000;</span><span>User Settings</span></a></li>
             <li><a href="#" data-nav="fingerprint"><span>&#128073;</span><span>Fingerprint</span></a></li>
+            <li><a href="#" data-nav="canmonitor"><span>🖵</span><span>Fingerprint</span></a></li>
         </ul>
         <a href="#"><i>≡</i></a>
     </nav>
@@ -207,6 +208,20 @@
             </tbody>
         </table>
     </main>
+    <main data-nav="canmonitor">
+        <h1>Messages</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>MessageId</th>
+                    <th>Data</th>
+                    <th>Data Len [byte]</th>
+                </tr>
+            </thead>
+            <tbody id="tblCanMessages"></tbody>
+        </table>
+    </main>
     <main data-nav="wifimanager">
 
         <h1>Current Connection (as stored in flash, maybe not connected)</h1>
@@ -288,9 +303,11 @@
 
         <h1>Current Fingers</h1>
         <div class="buttons">
+            <input id="btnOpenDoor" type="button" value="Open Door" />
             <input id="btnUpdateFingers" type="button" value="Update" />
             <input id="btnFingerprintEnroll" type="button" value="Enroll" />
             <input id="btnDeleteAll" type="button" value="Delete All" />
+            <input id="btnCancelInstruction" type="button" value="Cancel Instruction" />
         </div>
         <table>
             <thead>
@@ -325,6 +342,7 @@
         </div>
     </footer>
     <div id="modal" class="modal"><span class="loader"></span></div>
+    <div id="snackbar">Some text some message..</div>
     <script src="app.js" inline></script>
 </body>
 

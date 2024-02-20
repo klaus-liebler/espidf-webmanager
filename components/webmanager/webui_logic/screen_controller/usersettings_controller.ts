@@ -1,12 +1,10 @@
-import { RequestGetUserSettings, RequestSetUserSettings, ResponseGetUserSettings, ResponseSetUserSettings } from "../flatbuffers_gen/webmanager";
-import { Message } from "../flatbuffers_gen/webmanager/message";
-import { MessageWrapper } from "../flatbuffers_gen/webmanager/message-wrapper";
+import { RequestGetUserSettings, RequestSetUserSettings, RequestWrapper, Requests, ResponseGetUserSettings, ResponseSetUserSettings, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import us from "../usersettings_copied_during_build";
 import { BooleanItem, ConfigGroup, ConfigItemRT, EnumItem, IntegerItem, StringItem, ValueUpdater } from "../usersettings_base";
 import { T } from "../utils";
-import { Severrity } from "./dialog_controller";
+import { Severity } from "./dialog_controller";
 
 class ConfigGroupRT{
     constructor(public groupKey:string, public saveButton:HTMLInputElement, public updateButton:HTMLInputElement){}
@@ -55,9 +53,9 @@ export class UsersettingsController extends ScreenController implements ValueUpd
     private sendRequestGetUserSettings(groupKey:string) {
         let b = new flatbuffers.Builder(256);
         let n = RequestGetUserSettings.createRequestGetUserSettings(b, b.createString(groupKey));
-        let mw = MessageWrapper.createMessageWrapper(b, Message.RequestGetUserSettings, n);
+        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestGetUserSettings, n);
         b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Message.ResponseGetUserSettings], 3000);
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseGetUserSettings], 3000);
     }
 
     sendRequestSetUserSettings(groupKey:string) {
@@ -69,28 +67,28 @@ export class UsersettingsController extends ScreenController implements ValueUpd
         }
         let settingsOffset:number= ResponseGetUserSettings.createSettingsVector(b, vectorOfSettings)
         let n = RequestSetUserSettings.createRequestSetUserSettings(b, b.createString(groupKey), settingsOffset);
-        let mw = MessageWrapper.createMessageWrapper(b, Message.RequestSetUserSettings, n);
+        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestSetUserSettings, n);
         b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Message.ResponseSetUserSettings], 3000);
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseSetUserSettings], 3000);
     }
 
 
-    public onMessage(messageWrapper: MessageWrapper): void {
-        switch (messageWrapper.messageType()) {
-            case Message.ResponseGetUserSettings:
+    public onMessage(messageWrapper: ResponseWrapper): void {
+        switch (messageWrapper.responseType()) {
+            case Responses.ResponseGetUserSettings:
                 this.onResponseGetUserSettings(messageWrapper);
                 break;
-            case Message.ResponseSetUserSettings:
+            case Responses.ResponseSetUserSettings:
                 this.onResponseSetUserSettings(messageWrapper);
             default:
                 break;
         }
     }
-    public onResponseSetUserSettings(messageWrapper: MessageWrapper): void{
-        let resp = <ResponseSetUserSettings>messageWrapper.message(new ResponseSetUserSettings());
+    public onResponseSetUserSettings(messageWrapper: ResponseWrapper): void{
+        let resp = <ResponseSetUserSettings>messageWrapper.response(new ResponseSetUserSettings());
         let groupRtMap=this.groupName2itemName2configItemRT.get(resp.groupKey()!);
         if(!groupRtMap){
-            this.appManagement.DialogController().showOKDialog(Severrity.WARN, `Received settings for unknown group index ${resp.groupKey()}`);
+            this.appManagement.DialogController().showOKDialog(Severity.WARN, `Received settings for unknown group index ${resp.groupKey()}`);
             return;
         }
         groupRtMap.forEach((v,k,m)=>{v.Flag=false});
@@ -112,16 +110,16 @@ export class UsersettingsController extends ScreenController implements ValueUpd
             }
         });
         if(unknownKeys.length!=0 || nonStoredEntryKeys.length!=0){
-            this.appManagement.DialogController().showOKDialog(Severrity.WARN, `The following errors occured while receiving data for ${resp.groupKey()}: Unknown names: ${unknownKeys.join(", ")}; No successful storage for: ${nonStoredEntryKeys.join(", ")};`);
+            this.appManagement.DialogController().showOKDialog(Severity.WARN, `The following errors occured while receiving data for ${resp.groupKey()}: Unknown names: ${unknownKeys.join(", ")}; No successful storage for: ${nonStoredEntryKeys.join(", ")};`);
         }
         groupRtMap.forEach((v,k,m)=>{v.Flag=false});
     }
     
-    public onResponseGetUserSettings(messageWrapper: MessageWrapper): void{
-        let resp = <ResponseGetUserSettings>messageWrapper.message(new ResponseGetUserSettings());
+    public onResponseGetUserSettings(messageWrapper: ResponseWrapper): void{
+        let resp = <ResponseGetUserSettings>messageWrapper.response(new ResponseGetUserSettings());
         let groupRtMap=this.groupName2itemName2configItemRT.get(resp.groupKey()!);
         if(!groupRtMap){
-            this.appManagement.DialogController().showOKDialog(Severrity.WARN, `Received settings for unknown group index ${resp.groupKey()}`);
+            this.appManagement.DialogController().showOKDialog(Severity.WARN, `Received settings for unknown group index ${resp.groupKey()}`);
             return;
         }
         groupRtMap.forEach((v,k,m)=>{v.Flag=false});
@@ -145,13 +143,13 @@ export class UsersettingsController extends ScreenController implements ValueUpd
             }
         });
         if(unknownKeys.length!=0 || nonUpdatedEntries.length!=0){
-            this.appManagement.DialogController().showOKDialog(Severrity.WARN, `The following errors occured while receiving data for ${resp.groupKey()}: Unknown keys: ${unknownKeys.join(", ")}; No updates for: ${nonUpdatedEntries.join(", ")};`);
+            this.appManagement.DialogController().showOKDialog(Severity.WARN, `The following errors occured while receiving data for ${resp.groupKey()}: Unknown keys: ${unknownKeys.join(", ")}; No updates for: ${nonUpdatedEntries.join(", ")};`);
         }
     }
 
     
     onCreate(): void {
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseGetUserSettings, Message.ResponseSetUserSettings);
+        this.appManagement.registerWebsocketMessageTypes(this, Responses.ResponseGetUserSettings, Responses.ResponseSetUserSettings);
         this.cfg = us.Build();
         this.cfg.forEach((group, groupIndex)=>{
             let acc_pan=T(this.appManagement.MainElement(), "Accordion");

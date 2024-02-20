@@ -1,16 +1,16 @@
-import { NotifyLiveLogItem, Message } from "./flatbuffers_gen/webmanager";
-import { MessageWrapper} from "./flatbuffers_gen/webmanager/message-wrapper";
+
 import { AppManagement, WebsocketMessageListener } from "./app_management";
-import { DialogController, Severrity } from "./screen_controller/dialog_controller";
+import { DialogController, Severity } from "./screen_controller/dialog_controller";
 import { ControllerState, ScreenController, ScreenControllerWrapper, WeblogScreenController } from "./screen_controller/screen_controller";
 import { SystemScreenController } from "./screen_controller/systemscreen_controller";
 import * as flatbuffers from 'flatbuffers';
-import {$, gel } from "./utils";
+import {$, Html, gel, gqs } from "./utils";
 import { WifimanagerController } from "./screen_controller/wifimanager_controller";
 import { WS_URL } from "./constants";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
 import { TimeseriesController } from "./screen_controller/timeseries_controller";
 import { FingerprintScreenController } from "./screen_controller/fingerprint_controller";
+import { NotifyLiveLogItem, ResponseWrapper, Responses } from "./flatbuffers_gen/webmanager";
 //import { SensactScreenController } from "./screen_controller/sensact_controller";
 
 const ANSI_ESCAPE = new RegExp("(\\x9B|\\x1B\\[)[0-?]*[ -\\/]*[@-~]");
@@ -21,6 +21,10 @@ class AppController implements AppManagement, WebsocketMessageListener {
   private scroller = <HTMLDivElement>gel('scroller');
   private anchor = <HTMLDivElement>gel('anchor');
   private modal = <HTMLDivElement>gel("modal");
+  private snackbar = <HTMLDivElement>gel("snackbar");
+  private snackbarTimeout:number=-1;
+  private nav_hamburger=$("nav>a");
+  private nav_ul=$("nav>ul");
   private socket?: WebSocket;
   private messageCount = 0;
   
@@ -29,10 +33,11 @@ class AppController implements AppManagement, WebsocketMessageListener {
   private timeseriesScreenController?:TimeseriesController;
   private dialogController: DialogController;
   private messageType2listener: Map<number, Array<WebsocketMessageListener>>;
-  private messagesToUnlock:Array<Message>=[Message.NONE];
-  private modalSpinnerInterval:number=0;
-  private nav_hamburger!: HTMLElement;
-  private nav_ul!: HTMLElement;
+  private messagesToUnlock:Array<Responses>=[Responses.NONE];
+  private modalSpinnerTimeoutHandle:number=0;
+
+
+  
 
   public DialogController() { return this.dialogController; };
 
@@ -62,8 +67,8 @@ class AppController implements AppManagement, WebsocketMessageListener {
   }
 
   public AddScreenController<T extends ScreenController>(nameInNavAndInMain: string, type: { new(m:AppManagement): T ;}):ScreenController {
-    var mainElement = <HTMLElement>document.querySelector(`main[data-nav="${nameInNavAndInMain}"]`);
-    var anchorElement = <HTMLAnchorElement>document.querySelector(`a[data-nav="${nameInNavAndInMain}"]`);
+    var mainElement = gqs(`main[data-nav="${nameInNavAndInMain}"]`);
+    var anchorElement = gqs(`a[data-nav="${nameInNavAndInMain}"]`);
     var w = new ScreenControllerWrapper(nameInNavAndInMain, ControllerState.CREATED, mainElement, this);
     let controllerObject=new type(w);
     w.controller=controllerObject;
@@ -84,23 +89,33 @@ class AppController implements AppManagement, WebsocketMessageListener {
     this.messageType2listener = new Map<number, [WebsocketMessageListener]>;
     this.dialogController = new DialogController(this);
     
-    this.registerWebsocketMessageTypes(this, Message.NotifyLiveLogItem);
+    this.registerWebsocketMessageTypes(this, Responses.NotifyLiveLogItem);
   }
   MainElement(): HTMLElement {
     throw new Error("May not be called");
   }
   private modalSpinnerTimeout(){
     this.setModal(false);
-    this.dialogController.showOKDialog(Severrity.ERROR, "Server did not respond");
+    this.dialogController.showOKDialog(Severity.ERROR, "Server did not respond");
   }
 
-  sendWebsocketMessage(data: ArrayBuffer, messagesToUnlock:Array<Message>=[Message.NONE], maxWaitingTimeMs:number=2000): void {
+  sendWebsocketMessage(data: ArrayBuffer, messagesToUnlock:Array<Responses>=[Responses.NONE], maxWaitingTimeMs:number=2000): void {
     this.messagesToUnlock=messagesToUnlock;
-    if(messagesToUnlock && messagesToUnlock[0]!=Message.NONE){
+    if(messagesToUnlock && messagesToUnlock[0]!=Responses.NONE){
       this.setModal(true);
-      this.modalSpinnerInterval=setTimeout(()=>this.modalSpinnerTimeout(), maxWaitingTimeMs);
+      this.modalSpinnerTimeoutHandle=setTimeout(()=>this.modalSpinnerTimeout(), maxWaitingTimeMs);
     }
-    this.socket?.send(data);
+    try {
+      this.socket?.send(data);
+    } catch (error:any) {
+      this.setModal(false);
+      if(this.modalSpinnerTimeoutHandle){
+        clearTimeout(this.modalSpinnerTimeoutHandle);
+      }
+      this.dialogController.showOKDialog(Severity.ERROR, `Error while sending a request to server:${error}`);
+    }
+    
+    
   }
   
   public registerWebsocketMessageTypes(listener: WebsocketMessageListener, ...messageTypes: number[]): void {
@@ -115,6 +130,22 @@ class AppController implements AppManagement, WebsocketMessageListener {
   }
   public log(text:string){
     this.logInternal("I"+text);
+  }
+
+  public showSnackbar(severity:Severity, text:string){
+    if(this.snackbarTimeout>=0){
+      clearInterval(this.snackbarTimeout);
+    }
+    this.snackbar.innerText="";
+    Html(this.snackbar, "span", [], [DialogController.severity2class(severity)], DialogController.severity2symbol(severity));
+    Html(this.snackbar, "span", [], [], text);
+    this.snackbar.style.visibility="visible";
+    this.snackbar.style.animation="fadein 0.5s, fadeout 0.5s 2.5s";
+    setTimeout(()=>{
+      this.snackbar.style.visibility="hidden";
+      this.snackbar.style.animation="";
+      this.snackbarTimeout=-1;
+    }, 3000);
   }
 
   private logInternal(message:string){
@@ -137,23 +168,23 @@ class AppController implements AppManagement, WebsocketMessageListener {
   private onWebsocketData(data: ArrayBuffer) {
     if(data.byteLength==4096){//TODO: it is dumb idea to use the size of the message to test whether it is a raw timeseries message or not. But hopefully, Flatbuffer messages never get that big
       this.timeseriesScreenController?.onTimeseriesMessage(data);
-      if(this.messagesToUnlock.includes(Message.ResponseTimeseriesDummy)){
-        clearTimeout(this.modalSpinnerInterval);
-        this.messagesToUnlock=[Message.NONE];
+      if(this.messagesToUnlock.includes(Responses.ResponseTimeseriesDummy)){
+        clearTimeout(this.modalSpinnerTimeoutHandle);
+        this.messagesToUnlock=[Responses.NONE];
         this.setModal(false);
       }
       return;
     }
     let arr=new Uint8Array(data);
     let bb = new flatbuffers.ByteBuffer(arr);
-    let messageWrapper= MessageWrapper.getRootAsMessageWrapper(bb);
-    console.log(`A message of type ${messageWrapper.messageType()} with length ${data.byteLength} has arrived.`);
-    if(this.messagesToUnlock.includes(messageWrapper.messageType())){
-      clearTimeout(this.modalSpinnerInterval);
-      this.messagesToUnlock=[Message.NONE];
+    let messageWrapper= ResponseWrapper.getRootAsResponseWrapper(bb);
+    console.log(`A message of type ${messageWrapper.responseType()} with length ${data.byteLength} has arrived.`);
+    if(this.messagesToUnlock.includes(messageWrapper.responseType())){
+      clearTimeout(this.modalSpinnerTimeoutHandle);
+      this.messagesToUnlock=[Responses.NONE];
       this.setModal(false);
     }
-    this.messageType2listener.get(messageWrapper.messageType())?.forEach((v)=>{
+    this.messageType2listener.get(messageWrapper.responseType())?.forEach((v)=>{
       v.onMessage(messageWrapper);
     });
   }
@@ -162,8 +193,8 @@ class AppController implements AppManagement, WebsocketMessageListener {
     this.modal.style.display=state?"flex":"none";
   }
 
-  onMessage(messageWrapper: MessageWrapper): void {
-    let li=<NotifyLiveLogItem>messageWrapper.message(new NotifyLiveLogItem());
+  onMessage(messageWrapper: ResponseWrapper): void {
+    let li=<NotifyLiveLogItem>messageWrapper.response(new NotifyLiveLogItem());
     this.logInternal(<string>li.text());
   }
 
@@ -177,8 +208,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
     this.timeseriesScreenController = <TimeseriesController>this.AddScreenController("timeseries", TimeseriesController);
     this.dialogController.init();
     
-    this.nav_ul=$("nav>ul")!;
-    this.nav_hamburger =$("nav>a")!;
+
     this.nav_hamburger.onclick=(e)=>{
       if (this.nav_ul.style.display === "block") {
         this.nav_ul.style.display = "none";
@@ -198,8 +228,23 @@ class AppController implements AppManagement, WebsocketMessageListener {
         this.screenControllers.forEach(w=>w.controller.onCreate());
         this.activateScreen("home");
       };
-      this.socket.onerror = (event: Event) => { console.error('ESocketError'); };
-      this.socket.onmessage = (event:MessageEvent<any>) => {this.onWebsocketData(event.data);};
+      this.socket.onerror = (event: Event) => {
+        var message = `Websocket error ${event}`;
+        console.error(message);
+        this.DialogController().showOKDialog(Severity.ERROR, message); 
+      };
+      this.socket.onmessage = (event:MessageEvent<any>) => {
+        this.onWebsocketData(event.data);
+      };
+      this.socket.onclose = (event)=> {
+        if (event.code == 1000) {
+          console.info("The Websocket connection has been closed normally. But why????");
+          return;
+       }
+       var message = `Websocket has been closed ${event}`;
+       console.error(message);
+       this.DialogController().showOKDialog(Severity.ERROR, message); 
+     }
     } catch (e) {
       console.error('E ' + e);
     }

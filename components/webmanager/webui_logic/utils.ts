@@ -12,12 +12,12 @@ export class StringNumberTuple{
     public constructor(public s:string, public n:number){}
 }
 
-export const gel = (e:string) => document.getElementById(e)!;
-export const gqs = (e:string) => document.querySelector(e) as HTMLElement;
-export const gqsa = (cssSelector:string, fn:(value: HTMLElement, key: number, parent: NodeListOf<HTMLElement>) => void) => (document.querySelectorAll(cssSelector) as NodeListOf<HTMLElement>).forEach(fn);
-
 export const $=(selectorForSingleElement:string)=>document.querySelector(selectorForSingleElement) as HTMLElement;
 export const $$=(selectorForMultipleElements:string)=>document.querySelectorAll(selectorForMultipleElements);
+
+export const gel = (e:string) => document.getElementById(e)!;
+export const gqs = (e:string) => $(e);
+export const gqsa = (cssSelector:string, fn:(value: HTMLElement, key: number, parent: NodeListOf<HTMLElement>) => void) => (document.querySelectorAll(cssSelector) as NodeListOf<HTMLElement>).forEach(fn);
 
 export function EscapeToVariableName(n:string){
     return n.toLocaleUpperCase().replace(" ", "_");

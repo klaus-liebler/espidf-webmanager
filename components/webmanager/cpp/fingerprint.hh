@@ -14,7 +14,7 @@
 #include "esp_log.h"
 #define TAG "FINGER"
 #include <common.hh>
-namespace fingerprint
+namespace FINGERPRINT
 {
     constexpr TickType_t POWER_UP_DELAY_TICKS{pdMS_TO_TICKS(50)};
     constexpr size_t NOTEPAD_SIZE_BYTES{16 * 32};
@@ -84,6 +84,7 @@ namespace fingerprint
         AutoIdentify = 0x32,   // Automatic fingerprint verification
     };
 
+
     enum class RET
     {
         OK = 0x00,                           //!< Command execution is complete
@@ -118,22 +119,28 @@ namespace fingerprint
         FINGERPRINT_LIB_IS_EMPTY = 0x24,
         TIMEOUT = 0x26,
         FINGERPRINT_ALREADY_EXISTS = 0x27,
-        SENSOR_HARDWARE_ERROR = 0x029,
+        SENSOR_HARDWARE_ERROR = 0x29,
 
         UNSUPPORTED_COMMAND = 0xfc,
         HARDWARE_ERROR = 0xfd,
         COMMAND_EXECUTION_FAILURE = 0xfe,
+
+        xPARSER_CANNOT_FIND_STARTCODE = 0x100,
+        xPARSER_WRONG_MODULE_ADDRESS = 0x101,
+        xPARSER_ACKNOWLEDGE_PACKET_EXPECTED=0x102,
+        xPARSER_UNEXPECTED_LENGTH=0x103,
+        xPARSER_CHECKSUM_ERROR=0x104,
+        xPARSER_TIMEOUT=0x105,
+        xNVS_READWRITE_ERROR=0x106,
+        xNVS_NAME_ALREADY_EXISTS=0x107,
+        xNVS_NAME_UNKNOWN=0x108,
+        xNVS_NAME_TOO_LONG=0x109,
+        xCANNOT_GET_MUTEX=0x10A,
+        xNVS_NOT_AVAILABLE=0x10B,
+        //if changes are made here, update the enum fingerprint_controller.ts on web client
     };
     
-    enum class ParserError{
-        OK=0x00,
-        CANNOT_FIND_STARTCODE = 0x50,
-        WRONG_MODULE_ADDRESS = 0x51,
-        ACKNOWLEDGE_PACKET_EXPECTED=0x52,
-        UNEXPECTED_LENGTH=0x53,
-        CHECKSUM_ERROR=0x54,
-        TIMEOUT=0x55,
-    };
+
 
     enum class PARAM_INDEX : uint8_t
     {
@@ -203,8 +210,8 @@ namespace fingerprint
 
     class iFingerprintHandler{
         public:
-        virtual void HandleFingerprintDetected(bool success, uint16_t finger, uint16_t score)=0;
-        virtual void HandleEnrollmentUpdate(bool success, uint8_t step, uint16_t finger, const char* name)=0;
+        virtual void HandleFingerprintDetected(uint8_t errorCode, uint16_t finger, uint16_t score)=0;
+        virtual void HandleEnrollmentUpdate(uint8_t errorCode, uint8_t step, uint16_t finger, const char* name)=0;
     };
 
 
@@ -231,6 +238,7 @@ namespace fingerprint
         void task()
         {
             vTaskDelay(POWER_UP_DELAY_TICKS);
+            ESP_LOGI(TAG, "Fingerprint Task started");
             while(true){
                 if(isInEnrollment){
                     task_enroll();
@@ -245,31 +253,35 @@ namespace fingerprint
         void task_enroll(){
             const size_t wireLength{0x6+9};
             uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength, pdMS_TO_TICKS(20000));
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error during AutoEnrollment %d", (int)ret);
-                if(handler)handler->HandleEnrollmentUpdate(false, 0, 0, fingerName);
+            RET ret=receiveAndCheckPackage(buffer, wireLength, pdMS_TO_TICKS(20000));
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "Parser error in task_enroll %d", (int)ret);
+                if(handler)handler->HandleEnrollmentUpdate((uint8_t)ret, 0, 0, fingerName);
                 this->isInEnrollment=false;
                 return;
             }
-            //RET result = (RET)buffer[9];
+            ret = (RET)buffer[9];
             uint8_t step = buffer[10];
+            uint16_t fingerIndex =ParseU16_BE(buffer, 11);
             if(step!=0x0F){
                 ESP_LOGI(TAG, "'%s'", enrollStep2description[step]);
-                if(handler)handler->HandleEnrollmentUpdate(true, step, 0, fingerName);
+                if(handler)handler->HandleEnrollmentUpdate((uint8_t)ret, step, fingerIndex, fingerName);
                 return;
             }
-            uint16_t fingerIndexOr0xFFFF_inout =ParseUInt16(buffer, 11);
-            ESP_LOGI(TAG, "'%s', Finger is stored in index %d", enrollStep2description[step], fingerIndexOr0xFFFF_inout);
-            if(handler){
-                handler->HandleEnrollmentUpdate(true, step, fingerIndexOr0xFFFF_inout, fingerName);
-            }
+            esp_err_t err{ESP_OK};
             if(nvsHandle){
-                esp_err_t err = nvs_set_u16(this->nvsHandle, this->fingerName, fingerIndexOr0xFFFF_inout);
-                if(err!=ESP_OK){
-                    ESP_LOGE(TAG, "Finger with index %d could not be stored in nvs with key %s. Error code %d", fingerIndexOr0xFFFF_inout, fingerName, err);
-                }
+                err = nvs_set_u16(this->nvsHandle, this->fingerName, fingerIndex);
                 nvs_commit(this->nvsHandle);
+            }
+            if(err!=ESP_OK){
+                ESP_LOGE(TAG, "Finger with index %d could not be stored in nvs with key %s. Error code %d", fingerIndex, fingerName, err);
+                ret = RET::xNVS_READWRITE_ERROR;
+
+            }else{
+                ESP_LOGI(TAG, "'%s', Finger is stored in index %d", enrollStep2description[step], fingerIndex);
+            }
+            if(handler){
+                handler->HandleEnrollmentUpdate((uint8_t)ret, step, fingerIndex, fingerName);
             }
             this->isInEnrollment=false;
             return;
@@ -280,50 +292,71 @@ namespace fingerprint
             bool newIrqValue=gpio_get_level(gpio_irq);
             if(previousIrqLineValue==true && newIrqValue==false){
                 //negative edge detected
-                ESP_LOGI(TAG, "Negative edge detected, trying to read fingerprint");
+                ESP_LOGD(TAG, "Negative edge detected, trying to read fingerprint");
                 uint16_t fingerIndex;
                 uint16_t score;
                 RET ret= AutoIdentify(fingerIndex, score);
                 
                 if(ret==RET::OK){
                     ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d, score=%d", fingerIndex, score);
-                    if(this->handler) handler->HandleFingerprintDetected(true, fingerIndex, score);
+                    if(this->handler) handler->HandleFingerprintDetected(0, fingerIndex, score);
                 }else{
                     ESP_LOGI(TAG, "AutoIdentify returns %d", (int)ret);
-                    if(this->handler) handler->HandleFingerprintDetected(false, 0, 0);
+                    if(this->handler) handler->HandleFingerprintDetected((uint8_t)ret, 0, 0);
                 }
             }
             previousIrqLineValue=newIrqValue;
         }
 
-        void createAndSendDataPackage(PacketIdentifier pid, uint8_t* contents, size_t contentsLength){
+        void createAndSendDataPackage(PacketIdentifier pid, uint8_t* contents, size_t contentsLength, bool printHex=false){
             contentsLength=std::min((size_t)64, contentsLength);
             uint16_t packageLength=contentsLength+2;//data and checksum
             uint16_t wireLength=2+4+1+2+contentsLength+2;
             uint8_t buffer[wireLength];
-            WriteUInt16(STARTCODE, buffer, 0);
-            WriteUInt32(this->targetAddress, buffer, 2);
+            WriteU16_BE(STARTCODE, buffer, 0);
+            WriteU32_BE(this->targetAddress, buffer, 2);
             WriteU8((uint8_t)pid, buffer, 6);
-            WriteUInt16(packageLength, buffer, 7);
+            WriteU16_BE(packageLength, buffer, 7);
             std::memcpy(buffer+9, contents, contentsLength);
             uint16_t sum{0};
             for(size_t i=6; i<wireLength-2;i++){ sum+=buffer[i]; }
+            WriteU16_BE(sum, buffer, wireLength-2);
+            if(printHex) ESP_LOG_BUFFER_HEX(TAG, buffer, wireLength);
+            uart_flush_input(this->uart_num);
             uart_write_bytes(this->uart_num, buffer, wireLength);
 
         }
 
-        ParserError receiveAndCheckPackage(uint8_t* buf, size_t bufLen, TickType_t ticks_to_wait=DEFAULT_TIMEOUT_TICKS){
+        RET receiveAndCheckPackage(uint8_t* buf, size_t bufLen, TickType_t ticks_to_wait=DEFAULT_TIMEOUT_TICKS){
             int receivedBytes=uart_read_bytes(this->uart_num, buf, bufLen, ticks_to_wait);
-            if(receivedBytes!=bufLen) return ParserError::TIMEOUT;
-            if(ParseUInt16(buf, 0)!=STARTCODE) return ParserError::CANNOT_FIND_STARTCODE;
-            if(ParseUInt32(buf, 2)!=targetAddress) return ParserError::WRONG_MODULE_ADDRESS;
-            if(buf[6]!=(uint8_t)PacketIdentifier::ACKPACKET) return ParserError::ACKNOWLEDGE_PACKET_EXPECTED;
-            if(ParseUInt16(buf, 7)!=bufLen-9) return ParserError::UNEXPECTED_LENGTH;
+            if(receivedBytes!=bufLen) return RET::xPARSER_TIMEOUT;
+            if(ParseU16_BE(buf, 0)!=STARTCODE) return RET::xPARSER_CANNOT_FIND_STARTCODE;
+            if(ParseU32_BE(buf, 2)!=targetAddress){
+                ESP_LOGE(TAG, "Wrong Module Address %lu",ParseU32_BE(buf, 2));
+                return RET::xPARSER_WRONG_MODULE_ADDRESS;
+            } 
+            if(buf[6]!=(uint8_t)PacketIdentifier::ACKPACKET) return RET::xPARSER_ACKNOWLEDGE_PACKET_EXPECTED;
+            if(ParseU16_BE(buf, 7)!=bufLen-9) return RET::xPARSER_UNEXPECTED_LENGTH;
             uint16_t sum{0};
             for(size_t i=6; i<bufLen-2;i++){ sum+=buf[i];}
-            if(ParseUInt16(buf, bufLen-2)!=sum) return ParserError::CHECKSUM_ERROR;
+            if(ParseU16_BE(buf, bufLen-2)!=sum) return RET::xPARSER_CHECKSUM_ERROR;
             //if(buf[9]!=0) return (RET)buf[9];
-            return ParserError::OK;
+            return RET::OK;
+        }
+
+        RET GetRandomCode(uint32_t& randomCode_out){
+            uint8_t data[]{(uint8_t)INSTRUCTION::GetRandomCode};
+            createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data), true);
+            size_t wireLength{16};
+            uint8_t buffer[wireLength];
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            ESP_LOG_BUFFER_HEX(TAG, buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In GetRandomCode Parser error %d", (int)ret);
+                return ret;
+            }
+            randomCode_out=ParseU32_BE(buffer, 10);
+            return (RET)buffer[9];
         }
 
         RET SetSysPara(PARAM_INDEX param, uint8_t value){
@@ -331,10 +364,10 @@ namespace fingerprint
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
             size_t wireLength{12};
             uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error %d", (int)ret);
-                return RET::PACKET_RECIEVE_ERR;
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In SetSysPara Parser error %d", (int)ret);
+                return ret;
             }
             return (RET)buffer[9];
         }
@@ -344,39 +377,40 @@ namespace fingerprint
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
             const size_t wireLength{0x13+9};
             uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error %d", (int)ret);
-                return RET::PACKET_RECIEVE_ERR;
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In ReadSysPara Parser error %d", (int)ret);
+                return ret;
             }
             if(buffer[9]!=0){
                 return (RET)buffer[9];
             }
-            outParams.status=ParseUInt16(buffer, 10);
-            outParams.librarySize=ParseUInt16(buffer, 14);
-            outParams.securityLevel=ParseUInt16(buffer, 16);
-            outParams.deviceAddress=ParseUInt32(buffer, 18);
-            outParams.dataPacketSizeCode=ParseUInt16(buffer, 22);
-            outParams.baudRateTimes9600=ParseUInt16(buffer, 24);
+            outParams.status=ParseU16_BE(buffer, 10);
+            outParams.librarySize=ParseU16_BE(buffer, 14);
+            outParams.securityLevel=ParseU16_BE(buffer, 16);
+            outParams.deviceAddress=ParseU32_BE(buffer, 18);
+            outParams.dataPacketSizeCode=ParseU16_BE(buffer, 22);
+            outParams.baudRateTimes9600=ParseU16_BE(buffer, 24);
             return RET::OK;
         }
 
 
         RET Get32ByteString(INSTRUCTION instr, char** stringToBeDeletedByCaller){
-            *stringToBeDeletedByCaller = new char[33];
-            *stringToBeDeletedByCaller[32]='\0';
+            char* string = new char[33];
+            string[32]='\0';
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, (uint8_t*)&instr, 1);
             const size_t wireLength{0x23+9};
             uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error %d", (int)ret);
-                return RET::PACKET_RECIEVE_ERR;
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In Get32ByteString Parser error %d", (int)ret);
+                return ret;
             }
             if(buffer[9]!=0){
                 return (RET)buffer[9];
             }
-            strncpy(*stringToBeDeletedByCaller, (char*)(buffer+10), 32);
+            strncpy(string, (char*)(buffer+10), 32);
+            *stringToBeDeletedByCaller=string;
             return RET::OK;
         }
 
@@ -399,18 +433,19 @@ namespace fingerprint
         }
 
         RET DeleteChar(uint16_t index){
+            ESP_LOGI(TAG, "DeleteChar for index %d", index);
             uint8_t data[5];
             data[0]=(uint8_t)INSTRUCTION::DeleteChar;
-            WriteUInt16(index, data, 1);
-            WriteUInt16(1, data, 3);
+            WriteU16_BE(index, data, 1);
+            WriteU16_BE(1, data, 3);
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
 
             const size_t wireLength{0x3+9};
             uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error %d", (int)ret);
-                return RET::PACKET_RECIEVE_ERR;
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In DeleteChar: Parser error %d", (int)ret);
+                return ret;
             }
             return (RET)buffer[9];
         }
@@ -420,37 +455,27 @@ namespace fingerprint
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
             const size_t wireLength{0x3+9};
             uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error %d", (int)ret);
-                return RET::PACKET_RECIEVE_ERR;
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In EmptyLibrary: Parser error %d", (int)ret);
+                return ret;
             }
             return (RET)buffer[9];
         }
 
+
+
         RET AutoEnroll(uint16_t& fingerIndexOr0xFFFF_inout, bool overwriteExisting, bool duplicateFingerAllowed, bool returnStatusDuringProcess, bool fingerHasToLeaveBetweenScans){
             uint8_t data[7];
             data[0]=(uint8_t)INSTRUCTION::AutoEnroll;
-            WriteUInt16(fingerIndexOr0xFFFF_inout, data, 1);
+            WriteU16_BE(fingerIndexOr0xFFFF_inout, data, 1);
             data[3]=overwriteExisting?1:0;
             data[4]=duplicateFingerAllowed?1:0;
             data[5]=returnStatusDuringProcess?1:0;
             data[6]=fingerHasToLeaveBetweenScans?1:0;
-            createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
-            const size_t wireLength{0x6+9};
-            uint8_t buffer[wireLength];
-            ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-            if(ret!=ParserError::OK){
-                ESP_LOGE(TAG, "Parser error during AutoEnrollment %d", (int)ret);
-                return RET::PACKET_RECIEVE_ERR;
-            }
-            //RET result = (RET)buffer[9];
-            uint8_t step = buffer[10];
-            fingerIndexOr0xFFFF_inout =ParseUInt16(buffer, 11);
-            ESP_LOGI(TAG, "AutoEnroll started '%s'", enrollStep2description[step]);
-           
-            if(handler)handler->HandleEnrollmentUpdate(true, step, fingerIndexOr0xFFFF_inout, fingerName);
+            createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data), true);
             this->isInEnrollment=true;
+            ESP_LOGI(TAG, "AutoEnroll started"); 
             return RET::OK;
         }
 
@@ -458,26 +483,26 @@ namespace fingerprint
             uint8_t data[8];
             data[0]=(uint8_t)INSTRUCTION::AutoIdentify;
             data[1]=(uint8_t)securityLevel;
-            WriteUInt16(0x0, data, 2);//search over all fingers
-            WriteUInt16(0x05DC, data, 4);//search over all fingers
+            WriteU16_BE(0x0, data, 2);//search over all fingers
+            WriteU16_BE(0x05DC, data, 4);//search over all fingers
             data[6]=returnStatusDuringProcess?1:0;
             data[7]=maxScanAttempts;
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
             const size_t wireLength{0x8+9};
             uint8_t buffer[wireLength];
             while(true){
-                ParserError ret=receiveAndCheckPackage(buffer, wireLength);
-                if(ret!=ParserError::OK){
-                    ESP_LOGE(TAG, "Parser error %d", (int)ret);
-                    return RET::PACKET_RECIEVE_ERR;
+                RET ret=receiveAndCheckPackage(buffer, wireLength);
+                if(ret!=RET::OK){
+                    ESP_LOGE(TAG, "Parser error in AutoIdentify: %d", (int)ret);
+                    return ret;
                 }
                 if(buffer[9]!=0){
                     return (RET)buffer[9];
                 }
                 uint8_t step = buffer[10];
-                fingerIndex_out =ParseUInt16(buffer, 11);
-                score_out = ParseUInt16(buffer, 13);
-                ESP_LOGI(TAG, "'%s', Finger is stored in index %d", identifyStep2description[step], fingerIndex_out);
+                fingerIndex_out =ParseU16_BE(buffer, 11);
+                score_out = ParseU16_BE(buffer, 13);
+                ESP_LOGD(TAG, "'%s', Finger is stored in index %d", identifyStep2description[step], fingerIndex_out);
                 if(step==3) break;
             }
             return RET::OK;
@@ -487,7 +512,7 @@ namespace fingerprint
     public:
         M(uart_port_t uart_num, gpio_num_t gpio_irq, iFingerprintHandler* handler, nvs_handle_t nvsHandle, uint32_t targetAddress=DEFAULT_ADDRESS) : uart_num(uart_num), gpio_irq(gpio_irq), handler(handler), nvsHandle(nvsHandle), targetAddress(targetAddress) {}
         
-        esp_err_t begin(gpio_num_t txd, gpio_num_t rxd)
+        RET begin(gpio_num_t txd, gpio_num_t rxd)
         {
             fingerName[32]=0;
             
@@ -506,77 +531,105 @@ namespace fingerprint
             ESP_ERROR_CHECK(uart_set_pin(uart_num, (int)txd, (int)rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
             ESP_ERROR_CHECK(uart_flush(uart_num));
 
-            gpio_set_pull_mode(gpio_irq, GPIO_PULLUP_ONLY);
+            gpio_pullup_en(gpio_irq);
+            gpio_set_direction(gpio_irq, GPIO_MODE_INPUT);
 
-            RET ret = ReadAllSysPara(this->params);
+            RET ret =  ReadAllSysPara(this->params);
             if(ret!=RET::OK){
                 ESP_LOGE(TAG, "Communication error with fingerprint reader. Error code %d", (int)ret);
+                return RET::HARDWARE_ERROR;
             }
-
-            xTaskCreate(static_task, "fingerprint", 4096, this, 10, nullptr);
-            return ESP_OK;
+            ESP_LOGI(TAG, "Successfully connected with fingerprint addr=%lu; securityLevel=%u; libSize=%u; fwVer=%s; algVer=%s; status=%u", params.deviceAddress,params.securityLevel, params.librarySize, params.fwVer, params.algVer, params.status);
+            
+            xTaskCreate(static_task, "fingerprint", 3072, this, 10, nullptr);
+            return RET::OK;
         }
 
-        fingerprint::SystemParameter* GetAllParams(){
+        FINGERPRINT::SystemParameter* GetAllParams(){
             return &this->params;
         }
 
-        esp_err_t  TryEnrollAndStore(const char* name){
+        RET  TryEnrollAndStore(const char* name){
+            ESP_LOGI(TAG, "TryEnrollAndStore name=%s", name);
             uint16_t fingerIndex{0};
             if(nvsHandle){
-                if(nvs_get_u16(this->nvsHandle, name, &fingerIndex)!= ESP_ERR_NOT_FOUND){
+                if(nvs_get_u16(this->nvsHandle, name, &fingerIndex)!= ESP_ERR_NVS_NOT_FOUND){
                     ESP_LOGE(TAG, "Finger with name '%s' already exists", name);
-                    return ESP_FAIL;
+                    return RET::xNVS_NAME_ALREADY_EXISTS;
                 }
             }
              if(name && std::strlen(name)>32){
                 ESP_LOGE(TAG, "name is too long");
-                return ESP_FAIL;
+                return RET::xNVS_NAME_TOO_LONG;
             }
             if(name){
                 std::strncpy(this->fingerName, name, MAX_FINGERNAME_LEN);
             }
             if(!xSemaphoreTake(mutex, pdMS_TO_TICKS(3000))){
                 ESP_LOGE(TAG, "Cannot take mutex in enrollment after 3000ms");
-                return ESP_FAIL;
+                return RET::xCANNOT_GET_MUTEX;
             }
-            fingerIndex=0xFFFF;
-            RET ret = AutoEnroll(fingerIndex, false, false, true, true);
+            fingerIndex=0x05DC;
+            RET ret = AutoEnroll(fingerIndex, false, true, true, true);
             if(ret!=RET::OK){
                 ESP_LOGE(TAG, "Error %d while calling AutoEnroll.", (int)ret);
                 //Important: do not return here, because mutex will not be freed
             }
             
             xSemaphoreGive(mutex);
-            return ret==RET::OK;
+            return ret;
         }
 
-        esp_err_t TryRename(const char*  oldName, const char* newName){
-            if(!nvsHandle) return false;
+        RET TryRename(const char*  oldName, const char* newName){
+            if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
             uint16_t fingerIndex{0};
-            RETURN_ON_ERROR(nvs_get_u16(this->nvsHandle, oldName, &fingerIndex));
-            RETURN_ON_ERROR(nvs_erase_key(this->nvsHandle, oldName));
-            RETURN_ON_ERROR(nvs_set_u16(this->nvsHandle, newName, fingerIndex));
-            RETURN_ON_ERROR(nvs_commit(this->nvsHandle));
-            return ESP_OK;
+            if(nvs_get_u16(this->nvsHandle, newName, &fingerIndex)!= ESP_ERR_NVS_NOT_FOUND){
+                return RET::xNVS_NAME_ALREADY_EXISTS;
+            }
+            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsHandle, oldName, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_key(this->nvsHandle, oldName), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsHandle, newName, fingerIndex), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            return RET::OK;
         }
 
-        esp_err_t TryDelete(const char* name){
-            if(!nvsHandle) return false;
+        RET TryDelete(const char* name){
+            if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
             uint16_t fingerIndex{0};
-            RETURN_ON_ERROR(nvs_get_u16(this->nvsHandle, name, &fingerIndex));
-            DeleteChar(fingerIndex);
-            RETURN_ON_ERROR(nvs_erase_key(this->nvsHandle, name));
-            RETURN_ON_ERROR(nvs_commit(this->nvsHandle));
-            return ESP_OK;
+            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsHandle, name, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
+            RET ret = DeleteChar(fingerIndex);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "Error %d while calling TryDelete.", (int)ret);
+                return ret;
+            }
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_key(this->nvsHandle, name), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            return RET::OK;
         }
 
-        esp_err_t TryDeleteAll(){
-            if(!nvsHandle) return false;
-            if(EmptyLibrary()!=RET::OK) return ESP_FAIL;
-            RETURN_ON_ERROR(nvs_erase_all(this->nvsHandle));
-            RETURN_ON_ERROR(nvs_commit(this->nvsHandle));
-            return ESP_OK;
+        RET TryDeleteAll(){
+            if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
+            RET ret=EmptyLibrary();
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "Error %d while calling TryDeleteAll.", (int)ret);
+                return ret;
+            }
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            return RET::OK;
+        }
+
+        RET CancelInstruction(){
+            uint8_t data[]{(uint8_t)INSTRUCTION::Cancel};
+            createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
+            const size_t wireLength{0x3+9};
+            uint8_t buffer[wireLength];
+            RET ret=receiveAndCheckPackage(buffer, wireLength);
+            if(ret!=RET::OK){
+                ESP_LOGE(TAG, "In EmptyLibrary: Parser error %d", (int)ret);
+                return ret;
+            }
+            return (RET)buffer[9];
         }
     };
 

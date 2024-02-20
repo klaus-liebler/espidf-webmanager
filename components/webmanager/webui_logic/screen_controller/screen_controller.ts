@@ -1,8 +1,8 @@
-import { MessageWrapper, } from "../flatbuffers_gen/webmanager/message-wrapper";
+
 import { AppManagement, WebsocketMessageListener } from "../app_management";
+import { RequestJournal, RequestWrapper, Requests, ResponseJournal, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
 import { $, MyFavouriteDateTimeFormat } from "../utils";
-import { DialogController } from "./dialog_controller";
-import { Message, RequestJournal, ResponseJournal } from "../flatbuffers_gen/webmanager";
+import { DialogController, Severity } from "./dialog_controller";
 import * as flatbuffers from 'flatbuffers';
 
 export enum ControllerState {
@@ -21,7 +21,7 @@ export abstract class ScreenController implements WebsocketMessageListener {
     abstract onFirstStart(): void;
     abstract onRestart(): void;
     abstract onPause(): void;
-    abstract onMessage(messageWrapper:MessageWrapper):void;
+    abstract onMessage(messageWrapper:ResponseWrapper):void;
 }
 
 export class ScreenControllerWrapper  implements AppManagement{
@@ -38,17 +38,21 @@ export class ScreenControllerWrapper  implements AppManagement{
     registerWebsocketMessageTypes(listener: WebsocketMessageListener, ...messageType: number[]): void {
         return this.parent.registerWebsocketMessageTypes(listener, ...messageType);
     }
-    sendWebsocketMessage(data: ArrayBuffer, messageToUnlock?:Array<Message> | undefined, maxWaitingTimeMs?: number | undefined): void {
+    sendWebsocketMessage(data: ArrayBuffer, messageToUnlock?:Array<Responses> | undefined, maxWaitingTimeMs?: number | undefined): void {
         return this.parent.sendWebsocketMessage(data, messageToUnlock, maxWaitingTimeMs);
     }
 
     log(text:string){
         return this.parent.log(text);
     }
+
+    showSnackbar(severity:Severity, text:string){
+        return this.parent.showSnackbar(severity, text);
+    }
 }
 
 export class DefaultScreenController extends ScreenController {
-    onMessage(messageWrapper: MessageWrapper): void {
+    onMessage(messageWrapper: ResponseWrapper): void {
         
     }
     onCreate(): void {
@@ -68,8 +72,8 @@ export class DefaultScreenController extends ScreenController {
 
 
 export class WeblogScreenController extends ScreenController {
-    onMessage(messageWrapper: MessageWrapper): void {
-        let res = <ResponseJournal>messageWrapper.message(new ResponseJournal());
+    onMessage(messageWrapper: ResponseWrapper): void {
+        let res = <ResponseJournal>messageWrapper.response(new ResponseJournal());
         this.tblLogs.innerText="";
         for (let i = 0; i < res.journalItemsLength(); i++) {
             let item = res.journalItems(i);
@@ -93,13 +97,13 @@ export class WeblogScreenController extends ScreenController {
     sendRequestJournal(){
         let b = new flatbuffers.Builder(256);
         let n = RequestJournal.createRequestJournal(b);
-        let mw = MessageWrapper.createMessageWrapper(b, Message.RequestJournal, n);
+        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestJournal, n);
         b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Message.ResponseJournal], 3000);
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseJournal], 3000);
     }
 
     onCreate(): void {
-        this.appManagement.registerWebsocketMessageTypes(this, Message.ResponseJournal)
+        this.appManagement.registerWebsocketMessageTypes(this, Responses.ResponseJournal)
         this.sendRequestJournal();
         $("#btnUpdateJournal").onclick=()=>{
             this.sendRequestJournal();

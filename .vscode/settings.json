@@ -67,8 +67,10 @@
     "streambuf": "cpp",
     "thread": "cpp",
     "cinttypes": "cpp",
-    "typeinfo": "cpp"
+    "typeinfo": "cpp",
+    "*.inc": "cpp"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM17"
+  "idf.portWin": "COM4",
+  "idf.flashBaudRate": "921600"
 }

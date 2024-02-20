@@ -1,6 +1,4 @@
-import { RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, ResponseGetUserSettings, ResponseSetUserSettings, SettingWrapper, TimeGranularity } from "../flatbuffers_gen/webmanager";
-import { Message } from "../flatbuffers_gen/webmanager/message";
-import { MessageWrapper } from "../flatbuffers_gen/webmanager/message-wrapper";
+import { RequestTimeseries, RequestWrapper, Requests, ResponseWrapper, Responses, TimeGranularity } from "../flatbuffers_gen/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import { LineChart, LineChartOptions } from '../chartist/charts/LineChart/index';
@@ -9,7 +7,7 @@ import { AxisOptions } from "../chartist/core/types";
 
 export class TimeseriesController extends ScreenController {
     private chartSeconds?:LineChart;
-    onMessage(messageWrapper: MessageWrapper): void {
+    onMessage(messageWrapper: ResponseWrapper): void {
         throw new Error("TimeseriesController does not expect 'normal' messages");
     }
 
@@ -17,9 +15,9 @@ export class TimeseriesController extends ScreenController {
     private sendRequestTimeseries() {
         let b = new flatbuffers.Builder(256);
         let n = RequestTimeseries.createRequestTimeseries(b, 0, 0);
-        let mw = MessageWrapper.createMessageWrapper(b, Message.RequestTimeseries, n);
+        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestTimeseries, n);
         b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Message.ResponseTimeseriesDummy], 3000);
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseTimeseriesDummy], 3000);
     }
 
     private updateDate(date: Date, granularity: TimeGranularity) {
