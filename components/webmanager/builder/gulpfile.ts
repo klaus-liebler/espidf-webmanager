@@ -57,7 +57,7 @@ import * as htmlMinifier from "html-minifier";
 import * as cert from "./certificates"
 import { getMac } from "./esp32/esp32";
 import * as part from "./esp32/partition_parser"
-import { DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, DEST_FLATBUFFERS_TYPESCRIPT_WEBUI, DEST_USERSETTINGS_PATH, GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_PATH, GENERATED_FLATBUFFERS_CPP, FLATBUFFERS_SCHEMA_PATH, GENERATED_FLATBUFFERS_TS, WEBUI_TYPESCRIPT_MAIN_FILE_PATH, WEBUI_TSCONFIG_PATH, DIST_WEBUI_RAW, WEBUI_HTMLSCSS_PATH, SCSS_SPA_FILE, HTML_SPA_FILE, DIST_WEBUI_BUNDELED, DIST_WEBUI_COMPRESSED, HTML_SPA_FILE_BROTLI, GENERATED_CERTIFICATES, ROOT_CA_PEM_CRT, ROOT_CA_PEM_PRVTKEY, HOST_CERT_PEM_CRT, HOST_CERT_PEM_PRVTKEY, TESTSERVER_CERT_PEM_CRT, TESTSERVER_CERT_PEM_PRVTKEY, NVS_PART_TOOL } from "./paths";
+import { DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, WEBUI_GENERATED_USERSETTINGS_FILE, GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_FILE, GENERATED_FLATBUFFERS_CPP, FLATBUFFERS_SCHEMA_FILE, GENERATED_FLATBUFFERS_TS, WEBUI_TYPESCRIPT_MAIN_FILE, WEBUI_TSCONFIG_FILE, DIST_WEBUI_RAW, WEBUI_HTMLSCSS_PATH, SCSS_SPA_FILE, HTML_SPA_FILE, DIST_WEBUI_BUNDELED, DIST_WEBUI_COMPRESSED, HTML_SPA_FILE_BROTLI, GENERATED_CERTIFICATES, ROOT_CA_PEM_CRT, ROOT_CA_PEM_PRVTKEY, HOST_CERT_PEM_CRT, HOST_CERT_PEM_PRVTKEY, TESTSERVER_CERT_PEM_CRT, TESTSERVER_CERT_PEM_PRVTKEY, NVS_PART_TOOL, WEBUI_GENERATED_PATH, WEBUI_GENERATED_FLATBUFFERS_DIR } from "./paths";
 import * as snsct from "./gulpfile_sensact"
 import { MyCodeBuilderImpl, writeFileCreateDirLazy } from "./gulpfile_utils";
 import { usersettings_createPartition, usersettings_distribute_ts, usersettings_generate_cpp_code } from "./gulpfile_usersettings";
@@ -71,9 +71,10 @@ import { COM_PORT } from "./gulpfile_config";
 
 
 function clean(cb: gulp.TaskFunctionCallback) {
-  [DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, DEST_FLATBUFFERS_TYPESCRIPT_WEBUI, DEST_USERSETTINGS_PATH].forEach((path) => {
+  [DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, WEBUI_GENERATED_PATH].forEach((path) => {
     fs.rmSync(path, { recursive: true, force: true });
   });
+  fs.mkdirSync(WEBUI_GENERATED_PATH, {recursive:true})
   cb();
 }
 
@@ -81,19 +82,19 @@ function clean(cb: gulp.TaskFunctionCallback) {
 
 
 function flatbuffers_generate_c(cb: gulp.TaskFunctionCallback) {
-  exec(`flatc -c --gen-all -o ${GENERATED_FLATBUFFERS_CPP} ${FLATBUFFERS_SCHEMA_PATH}`, (err, stdout, stderr) => {
+  exec(`flatc -c --gen-all -o ${GENERATED_FLATBUFFERS_CPP} ${FLATBUFFERS_SCHEMA_FILE}`, (err, stdout, stderr) => {
     cb(err);
   });
 }
 
 function flatbuffers_generate_ts(cb: gulp.TaskFunctionCallback) {
-  exec(`flatc -T --gen-all --ts-no-import-ext -o ${GENERATED_FLATBUFFERS_TS} ${FLATBUFFERS_SCHEMA_PATH}`, (err, stdout, stderr) => {
+  exec(`flatc -T --gen-all --ts-no-import-ext -o ${GENERATED_FLATBUFFERS_TS} ${FLATBUFFERS_SCHEMA_FILE}`, (err, stdout, stderr) => {
     cb(err);
   });
 }
 
 function flatbuffers_distribute_ts(cb: gulp.TaskFunctionCallback) {
-  fs.cpSync(GENERATED_FLATBUFFERS_TS, DEST_FLATBUFFERS_TYPESCRIPT_WEBUI, { recursive: true });
+  fs.cpSync(GENERATED_FLATBUFFERS_TS, WEBUI_GENERATED_FLATBUFFERS_DIR, { recursive: true });
   fs.cpSync(GENERATED_FLATBUFFERS_TS, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, { recursive: true });
   cb();
 }
@@ -103,9 +104,9 @@ function flatbuffers_distribute_ts(cb: gulp.TaskFunctionCallback) {
 function typescriptCompile(cb: gulp.TaskFunctionCallback) {
   return rollup
   .rollup({
-    input: WEBUI_TYPESCRIPT_MAIN_FILE_PATH,
+    input: WEBUI_TYPESCRIPT_MAIN_FILE,
     plugins: [
-      rollupTypescript({ tsconfig: WEBUI_TSCONFIG_PATH }),
+      rollupTypescript({ tsconfig: WEBUI_TSCONFIG_FILE }),
       nodeResolve()
     ]
   })
@@ -158,7 +159,7 @@ exports.build = gulp.series(
   usersettings_generate_cpp_code,
   usersettings_distribute_ts,
   usersettings_createPartition,
-  snsct.fetchGeneratedFlatbufferSources,
+  snsct.fetchGeneratedFlatbufferCppSources,
   snsct.sendCommandImplementation_template,
   snsct.sensactapps_template,
   flatbuffers_generate_c,

@@ -1,34 +1,29 @@
 
 import https from "node:https";
+import http from "node:http";
 import * as fs from "node:fs";
 import * as flatbuffers from 'flatbuffers';
 import { WebSocketServer, WebSocket, RawData } from "ws";
-import { MessageWrapper } from "./flatbuffers_gen/webmanager/message-wrapper";
-import { Message } from "./flatbuffers_gen/webmanager/message";
 import { ResponseSystemData } from "./flatbuffers_gen/webmanager/response-system-data";
 import { PartitionInfo } from "./flatbuffers_gen/webmanager/partition-info";
 import { Mac6, } from "./flatbuffers_gen/webmanager/mac6";
 import { NotifyLiveLogItem } from "./flatbuffers_gen/webmanager/notify-live-log-item";
 import { AccessPoint } from "./flatbuffers_gen/webmanager/access-point";
-import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./flatbuffers_gen/webmanager";
+import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./flatbuffers_gen/webmanager";
 import { createTimeseries } from "./timeseries_generator";
 
 
-const PORT = 443;
+const PORT = 3000;
 const BUNDLED_FILE = "../dist_webui/compressed/app.html.br";
 
 const wss = new WebSocketServer({ noServer: true });
 
 function sendResponseSystemData(ws: WebSocket) {
     let b = new flatbuffers.Builder(1024);
-    let labelOffset = b.createString("Label");
-    let appnameOffset = b.createString("AppName");
-    let appversionOffset = b.createString("AppVersion");
-    let appdateOffset = b.createString("AppDate");
-    let apptimeOffset = b.createString("AppTime");
-    let piOffset = PartitionInfo.createPartitionInfo(b, labelOffset, 1, 1, 1, 1, true, appnameOffset, appversionOffset, appdateOffset, apptimeOffset);
+    let piOffset0 = PartitionInfo.createPartitionInfo(b, b.createString("Label0"), 0, 0x10, 3072, 1, true, b.createString("AppName"), b.createString("AppVersion"), b.createString("AppDate"), b.createString("AppTime"));
+    let piOffset1 = PartitionInfo.createPartitionInfo(b, b.createString("Label1"), 1, 0x01, 16384, 1, true, b.createString("AppName"), b.createString("AppVersion"), b.createString("AppDate"), b.createString("AppTime"));
 
-    let piVecOffset = ResponseSystemData.createPartitionsVector(b, [piOffset]);
+    let piVecOffset = ResponseSystemData.createPartitionsVector(b, [piOffset0, piOffset1]);
     ResponseSystemData.startResponseSystemData(b);
     ResponseSystemData.addChipCores(b, 2);
     ResponseSystemData.addChipFeatures(b, 255);
@@ -45,13 +40,13 @@ function sendResponseSystemData(ws: WebSocket) {
     ResponseSystemData.addSecondsEpoch(b, BigInt(Math.floor(new Date().getTime() / 1000)));
     ResponseSystemData.addSecondsUptime(b, BigInt(10));
     let rsd = ResponseSystemData.endResponseSystemData(b);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseSystemData, rsd));
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseSystemData, rsd));
     ws.send(b.asUint8Array());
 }
 
 function sendResponseFingerprintSensorInfo(ws: WebSocket) {
     let b = new flatbuffers.Builder(1024);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseFingerprintSensorInfo,
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingerprintSensorInfo,
         ResponseFingerprintSensorInfo.createResponseFingerprintSensorInfo(b, 42, 43, 3, 0x55AA55AA, 1, 6, b.createString("algVer"), b.createString("fwVer"))
         ));
     ws.send(b.asUint8Array());
@@ -65,7 +60,7 @@ function sendResponseFingers(ws: WebSocket) {
         Finger.createFinger(b, b.createString("Steffi links mitte"), 2)
 
     ]);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseFingers,
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingers,
         ResponseFingers.createResponseFingers(b, fingersOffset)
         ));
     ws.send(b.asUint8Array());
@@ -82,7 +77,7 @@ function sendResponseWifiAccesspoints(ws: WebSocket) {
     let r = ResponseNetworkInformation.createResponseNetworkInformation(b, 
         b.createString("MyHostnameKL"), 
         b.createString("MySsidApKL"),  b.createString("Password"), 32,true, b.createString("ssidSta"), 32,43,23,23,accesspointsOffset);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseNetworkInformation, r));
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseNetworkInformation, r));
     ws.send(b.asUint8Array());
 }
 
@@ -90,10 +85,10 @@ function sendResponseWifiConnectionSuccessOrFailed(ws: WebSocket, req: RequestWi
     let b = new flatbuffers.Builder(1024);
     if(req.ssid()==AP_GOOD){
         let r = ResponseWifiConnectSuccessful.createResponseWifiConnectSuccessful(b, b.createString(AP_GOOD), 0xFF101001,0x10101002,0xFF101003, -62);
-        b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseWifiConnectSuccessful, r));
+        b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseWifiConnectSuccessful, r));
     }else{
         let r = ResponseWifiConnectFailed.createResponseWifiConnectFailed(b, b.createString(AP_GOOD));
-        b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseWifiConnectFailed, r));
+        b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseWifiConnectFailed, r));
     }
     ws.send(b.asUint8Array());
 }
@@ -125,7 +120,7 @@ function sendResponseGetUserSettings(ws: WebSocket, req: RequestGetUserSettings)
     }
 
     let r = ResponseGetUserSettings.createResponseGetUserSettings(b, b.createString(groupName), settingsOffset);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseGetUserSettings, r));
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseGetUserSettings, r));
     ws.send(b.asUint8Array());
 }
 
@@ -142,7 +137,7 @@ function sendResponseSetUserSettings(ws: WebSocket, req: RequestSetUserSettings)
     names.forEach((v) => stringsOffset.push(b.createString(v)));
     let settingsOffset = ResponseSetUserSettings.createSettingKeysVector(b, stringsOffset);
     let r = ResponseSetUserSettings.createResponseSetUserSettings(b, b.createString(groupName), settingsOffset);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseSetUserSettings, r));
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseSetUserSettings, r));
     ws.send(b.asUint8Array());
 }
 
@@ -158,7 +153,7 @@ function sendResponseJournal(ws: WebSocket) {
     counter++;
 
     let r = ResponseJournal.createResponseJournal(b, itemsOffset);
-    b.finish(MessageWrapper.createMessageWrapper(b, Message.ResponseJournal, r));
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseJournal, r));
     ws.send(b.asUint8Array());
 }
 
@@ -171,35 +166,35 @@ function process(buffer: Buffer, ws: WebSocket) {
     let data = new Uint8Array(buffer);
     let b_input = new flatbuffers.ByteBuffer(data);
     let b = new flatbuffers.Builder(1024);
-    let mw = MessageWrapper.getRootAsMessageWrapper(b_input);
-    console.log(`Received buffer length ${buffer.byteLength} and Type is ${mw.messageType()}`);
-    switch (mw.messageType()) {
-        case Message.RequestNetworkInformation:
+    let mw = RequestWrapper.getRootAsRequestWrapper(b_input);
+    console.log(`Received buffer length ${buffer.byteLength} and Type is ${mw.requestType()}`);
+    switch (mw.requestType()) {
+        case Requests.RequestNetworkInformation:
             setTimeout(() => { sendResponseWifiAccesspoints(ws); }, 500);
             break;
-        case Message.RequestSystemData:
+        case Requests.RequestSystemData:
             setTimeout(() => { sendResponseSystemData(ws); }, 500);
             break;
-        case Message.RequestGetUserSettings:
-            setTimeout(() => { sendResponseGetUserSettings(ws, <RequestGetUserSettings>mw.message(new RequestGetUserSettings())); }, 500);
+        case Requests.RequestGetUserSettings:
+            setTimeout(() => { sendResponseGetUserSettings(ws, <RequestGetUserSettings>mw.request(new RequestGetUserSettings())); }, 500);
             break;
-        case Message.RequestSetUserSettings:
-            setTimeout(() => { sendResponseSetUserSettings(ws, <RequestSetUserSettings>mw.message(new RequestSetUserSettings())); }, 100);
+        case Requests.RequestSetUserSettings:
+            setTimeout(() => { sendResponseSetUserSettings(ws, <RequestSetUserSettings>mw.request(new RequestSetUserSettings())); }, 100);
             break;
-        case Message.RequestJournal:
+        case Requests.RequestJournal:
             setTimeout(() => { sendResponseJournal(ws);}, 100);
             break;
-        case Message.RequestTimeseries:
-            setTimeout(()=>{sendResponseTimeseries(ws, <RequestTimeseries>mw.message(new RequestTimeseries())), 200});
+        case Requests.RequestTimeseries:
+            setTimeout(()=>{sendResponseTimeseries(ws, <RequestTimeseries>mw.request(new RequestTimeseries())), 200});
             break;
-        case Message.RequestWifiConnect:{
-            setTimeout(()=>{sendResponseWifiConnectionSuccessOrFailed(ws, <RequestWifiConnect>mw.message(new RequestWifiConnect()));}, 3000);
+        case Requests.RequestWifiConnect:{
+            setTimeout(()=>{sendResponseWifiConnectionSuccessOrFailed(ws, <RequestWifiConnect>mw.request(new RequestWifiConnect()));}, 3000);
             break;
         }
-        case Message.RequestFingerprintSensorInfo:
+        case Requests.RequestFingerprintSensorInfo:
             setTimeout(()=>sendResponseFingerprintSensorInfo(ws), 100);
             break;
-        case Message.RequestFingers:
+        case Requests.RequestFingers:
             setTimeout(()=>sendResponseFingers(ws), 100);
 
         default:
@@ -210,7 +205,8 @@ function process(buffer: Buffer, ws: WebSocket) {
 let hostCert =fs.readFileSync("./../certificates/testserver.pem.crt").toString();
 let hostPrivateKey = fs.readFileSync("./../certificates/testserver.pem.prvtkey").toString();
 
-let server = https.createServer({key: hostPrivateKey, cert: hostCert}, (req, res) => {
+let server = http.createServer((req, res) => {
+//let server = https.createServer({key: hostPrivateKey, cert: hostCert}, (req, res) => {
     console.log(`Request received for '${req.url}'`);
     //var local_path = new URL(req.url).pathname;
 
@@ -235,6 +231,7 @@ let server = https.createServer({key: hostPrivateKey, cert: hostCert}, (req, res
 
 server.on('upgrade', (req, sock, head) => {
     if (req.url == '/webmanager_ws') {
+        console.info("Handle upgrade to websocket");
         wss.handleUpgrade(req, sock, head, ws => wss.emit('connection', ws, req));
     } else {
         sock.destroy();
@@ -244,9 +241,11 @@ server.on('upgrade', (req, sock, head) => {
 var messageChanger = 0;
 
 wss.on('connection', (ws) => {
+    console.info("Handle connection");
     ws.on('error', console.error);
 
     ws.on('message', (data: Buffer, isBinary: boolean) => {
+        
         process(data, ws);
     });
 });
@@ -266,7 +265,7 @@ server.listen(PORT, () => {
                 NotifyLiveLogItem.startNotifyLiveLogItem(b);
                 NotifyLiveLogItem.addText(b, text);
                 let li = NotifyLiveLogItem.endNotifyLiveLogItem(b);
-                mw = MessageWrapper.createMessageWrapper(b, Message.NotifyLiveLogItem, li);
+                mw = ResponseWrapper.createResponseWrapper(b, Responses.NotifyLiveLogItem, li);
                 b.finish(mw);
                 //wss.clients.forEach(ws => ws.send(b.asUint8Array()));
                 break;

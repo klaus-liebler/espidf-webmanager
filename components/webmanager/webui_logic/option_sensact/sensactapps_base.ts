@@ -1,5 +1,5 @@
-import { ApplicationId } from "./flatbuffers_gen/application-id";
-import * as x from "./sendCommandImplementation_copied_during_build";
+import { ApplicationId } from "../generated/flatbuffers/application-id";
+import * as x from "../generated/option_sensact/sendCommandImplementation_copied_during_build";
 import { T } from "../utils";
 
 export interface SensactContext {

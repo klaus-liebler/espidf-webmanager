@@ -1,6 +1,6 @@
 
 import { AppManagement, WebsocketMessageListener } from "../app_management";
-import { RequestJournal, RequestWrapper, Requests, ResponseJournal, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
+import { RequestJournal, RequestWrapper, Requests, ResponseJournal, ResponseWrapper, Responses } from "../generated/flatbuffers/webmanager";
 import { $, MyFavouriteDateTimeFormat } from "../utils";
 import { DialogController, Severity } from "./dialog_controller";
 import * as flatbuffers from 'flatbuffers';

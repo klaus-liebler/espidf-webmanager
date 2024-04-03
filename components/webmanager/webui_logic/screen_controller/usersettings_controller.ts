@@ -1,7 +1,7 @@
-import { RequestGetUserSettings, RequestSetUserSettings, RequestWrapper, Requests, ResponseGetUserSettings, ResponseSetUserSettings, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
+import { RequestGetUserSettings, RequestSetUserSettings, RequestWrapper, Requests, ResponseGetUserSettings, ResponseSetUserSettings, ResponseWrapper, Responses } from "../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
-import us from "../usersettings_copied_during_build";
+import us from "../generated/usersettings_copied_during_build";
 import { BooleanItem, ConfigGroup, ConfigItemRT, EnumItem, IntegerItem, StringItem, ValueUpdater } from "../usersettings_base";
 import { T } from "../utils";
 import { Severity } from "./dialog_controller";

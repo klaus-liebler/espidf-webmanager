@@ -1,9 +1,7 @@
 import { AppManagement } from "../app_management";
 import { $, A, Html, SvgIcon, gel, gqs } from "../utils"
 
-export interface IDialogBodyRenderer {
-    Render(dialogBody: HTMLDivElement): HTMLInputElement | null;
-}
+
 
 export enum Severity {
     SUCCESS,

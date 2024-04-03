@@ -6,8 +6,8 @@ import gulp from "gulp";
 import path from "path";
 import { EscapeToVariableName } from "../usersettings/usersettings_base";
 import { MyCodeBuilderImpl, writeFileCreateDirLazy } from "./gulpfile_utils";
-import { GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_PATH, DEST_USERSETTINGS_PATH } from "./paths";
-import UserSettings from "../usersettings/usersettings";
+import { GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_FILE, WEBUI_GENERATED_USERSETTINGS_FILE } from "./paths";
+import UserSettings from "../usersettings/definition/usersettings";
 import fs from "node:fs";
 import { COM_PORT, USERSETTINGS_PARTITION_NAME, USERSETTINGS_PARTITION_SIZE_KILOBYTES } from "./gulpfile_config";
 
@@ -63,7 +63,7 @@ export function usersettings_createPartition(cb:gulp.TaskFunctionCallback){
 
 //this is necessary to copy the usersettings in the context of the browser client project. There, the usersettings_base.ts is totally different from the one used in the build process
 export function usersettings_distribute_ts(cb: gulp.TaskFunctionCallback) {
-  fs.copyFile(USERSETTINGS_PATH, DEST_USERSETTINGS_PATH, cb);
+  fs.copyFile(USERSETTINGS_FILE, WEBUI_GENERATED_USERSETTINGS_FILE, cb);
 }
 
 exports.flashusersettings = (cb: gulp.TaskFunctionCallback)=>{

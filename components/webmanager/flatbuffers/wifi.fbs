@@ -1,7 +1,7 @@
 namespace webmanager;
 
 table AccessPoint{
-    ssid:string;
+    ssid:string (required);
     primary_channel:int;
     rssi:int;
     auth_mode:int;
@@ -24,7 +24,7 @@ table ResponseNetworkInformation{
     gateway_sta:uint32;
     rssi_sta:int8;
 
-    accesspoints:[AccessPoint];
+    accesspoints:[AccessPoint] (required);
 }
 
 

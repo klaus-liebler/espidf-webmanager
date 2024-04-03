@@ -1,8 +1,8 @@
 
 import * as flatbuffers from 'flatbuffers';
-import { ApplicationId } from './flatbuffers_gen/application-id';
-import { Command } from './flatbuffers_gen/command';
-import { CommandMessage } from './flatbuffers_gen/websensact/command-message';
+import { ApplicationId } from '../generated/flatbuffers/application-id';
+import { Command } from '../generated/flatbuffers/command';
+import { CommandMessage } from '../generated/flatbuffers/websensact/command-message';
 
 export async function sendCommandMessage(id: ApplicationId, cmd: Command, payload: Uint8Array) {
     let b = new flatbuffers.Builder(1024);

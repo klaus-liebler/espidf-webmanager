@@ -1,4 +1,4 @@
-import {NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestRestart, RequestSystemData, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseSystemData, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
+import {NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestRestart, RequestSystemData, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseSystemData, ResponseWrapper, Responses } from "../generated/flatbuffers/webmanager";
 import { Html, gel} from "../utils";
 import { Severity } from "./dialog_controller";
 import { ScreenController } from "./screen_controller";

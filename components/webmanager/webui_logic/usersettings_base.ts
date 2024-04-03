@@ -1,4 +1,4 @@
-import { BooleanSetting, EnumSetting, IntegerSetting, Setting, SettingWrapper, StringSetting } from './flatbuffers_gen/webmanager';
+import { BooleanSetting, EnumSetting, IntegerSetting, Setting, SettingWrapper, StringSetting } from './generated/flatbuffers/webmanager';
 import { A, T } from './utils'
 import * as flatbuffers from 'flatbuffers';
 

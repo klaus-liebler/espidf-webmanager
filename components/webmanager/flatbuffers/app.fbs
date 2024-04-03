@@ -2,7 +2,7 @@ include "wifi.fbs";
 include "systeminfo.fbs";
 include "usersettings.fbs";
 include "timeseries.fbs";
-//include "websensact.fbs";
+include "websensact.fbs";
 include "fingerprint.fbs";
 include "canmonitor.fbs";
 
@@ -51,6 +51,7 @@ union Responses{
 }
 
 union Requests{
+    websensact.CommandMessage,
     RequestNetworkInformation, 
     RequestWifiConnect, 
     RequestWifiDisconnect, 

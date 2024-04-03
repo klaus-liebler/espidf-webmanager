@@ -1,4 +1,4 @@
-import { RequestTimeseries, RequestWrapper, Requests, ResponseWrapper, Responses, TimeGranularity } from "../flatbuffers_gen/webmanager";
+import { RequestTimeseries, RequestWrapper, Requests, ResponseWrapper, Responses, TimeGranularity } from "../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import { LineChart, LineChartOptions } from '../chartist/charts/LineChart/index';

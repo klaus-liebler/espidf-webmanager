@@ -1,5 +1,5 @@
-import { ApplicationId } from './flatbuffers_gen/application-id';
-import { Command } from './flatbuffers_gen/command';
-import { sendCommandMessage } from './utils_sensact';
+import { ApplicationId } from '../flatbuffers/application-id'
+import { Command } from '../flatbuffers/command';
+import { sendCommandMessage } from '../../option_sensact/utils_sensact'
 
 //TEMPLATE_HERE

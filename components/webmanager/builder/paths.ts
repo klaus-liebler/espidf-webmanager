@@ -25,10 +25,10 @@ export const TESTSERVER_CERT_PEM_CRT = "testserver.pem.crt";
 export const TESTSERVER_CERT_PEM_PRVTKEY = "testserver.pem.prvtkey";
 export const TESTSERVER_PATH = path.join(ROOT, "testserver");
 
-export const WEBUI_TSCONFIG_PATH = path.join(WEBUI_LOGIC_PATH, "tsconfig.json");
-export const WEBUI_TYPESCRIPT_MAIN_FILE_PATH = path.join(WEBUI_LOGIC_PATH, TS_MAIN_FILE);
-export const FLATBUFFERS_SCHEMA_PATH = path.join(ROOT, "flatbuffers", "app.fbs");
-export const USERSETTINGS_PATH = path.join(ROOT, "usersettings", "usersettings.ts");
+export const WEBUI_TSCONFIG_FILE = path.join(WEBUI_LOGIC_PATH, "tsconfig.json");
+export const WEBUI_TYPESCRIPT_MAIN_FILE = path.join(WEBUI_LOGIC_PATH, TS_MAIN_FILE);
+export const FLATBUFFERS_SCHEMA_FILE = path.join(ROOT, "flatbuffers", "app.fbs");
+export const USERSETTINGS_FILE = path.join(ROOT, "usersettings", "definition", "usersettings.ts");
 
 //intermediate and distribution
 export const GENERATED_PATH = path.join(ROOT, "generated");
@@ -43,10 +43,12 @@ export const DIST_WEBUI_PATH = path.join(ROOT, "dist_webui");
 export const DIST_WEBUI_RAW = path.join(DIST_WEBUI_PATH, "raw");
 export const DIST_WEBUI_BUNDELED = path.join(DIST_WEBUI_PATH, "bundeled");
 export const DIST_WEBUI_COMPRESSED = path.join(DIST_WEBUI_PATH, "compressed");
-export const DEST_FLATBUFFERS_TYPESCRIPT_WEBUI = path.join(WEBUI_LOGIC_PATH, "flatbuffers_gen");
 export const DEST_FLATBUFFERS_TYPESCRIPT_SERVER = path.join(TESTSERVER_PATH, "flatbuffers_gen");
 
-export const DEST_USERSETTINGS_PATH = path.join(WEBUI_LOGIC_PATH, "usersettings_copied_during_build.ts");
+export const WEBUI_GENERATED_PATH = path.join(WEBUI_LOGIC_PATH, "generated");
+export const WEBUI_GENERATED_FLATBUFFERS_DIR = path.join(WEBUI_GENERATED_PATH, "flatbuffers");
+export const WEBUI_GENERATED_USERSETTINGS_FILE = path.join(WEBUI_GENERATED_PATH, "usersettings_copied_during_build.ts");
+export const WEBUI_GENERATED_SENSACT_DIR = path.join(WEBUI_GENERATED_PATH, "sensact");
 
 //Location of esp idf tools
 export const NVS_PART_GEN_TOOL=path.join(IDF_PATH, "components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py");

@@ -2,7 +2,7 @@ import { Severity } from "./dialog_controller";
 import { ScreenController } from "./screen_controller";
 import { gel, $, gqsa, Html, ip4_2_string } from "../utils";
 import * as flatbuffers from 'flatbuffers';
-import { RequestNetworkInformation, RequestWifiConnect, RequestWifiDisconnect, RequestWrapper, Requests, ResponseNetworkInformation, ResponseWifiConnectSuccessful, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
+import { RequestNetworkInformation, RequestWifiConnect, RequestWifiDisconnect, RequestWrapper, Requests, ResponseNetworkInformation, ResponseWifiConnectSuccessful, ResponseWrapper, Responses } from "../generated/flatbuffers/webmanager";
 
 const icon_lock_template = document.getElementById("icon-lock") as HTMLTemplateElement;
 const icon_rssi_template = document.getElementById("icon-wifi") as HTMLTemplateElement;

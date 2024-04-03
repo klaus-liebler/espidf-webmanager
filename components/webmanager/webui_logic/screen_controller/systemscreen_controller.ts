@@ -1,4 +1,4 @@
-import { Mac6, RequestRestart, RequestSystemData, RequestWrapper, Requests, ResponseSystemData, ResponseWrapper, Responses } from "../flatbuffers_gen/webmanager";
+import { Mac6, RequestRestart, RequestSystemData, RequestWrapper, Requests, ResponseSystemData, ResponseWrapper, Responses } from "../generated/flatbuffers/webmanager";
 import { findChipModel, findChipFeatures, findPartitionState, findPartitionSubtype } from "../esp32";
 import { gel, MyFavouriteDateTimeFormat } from "../utils";
 import { ScreenController } from "./screen_controller";

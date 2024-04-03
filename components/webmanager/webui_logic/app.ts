@@ -10,7 +10,7 @@ import { WS_URL } from "./constants";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
 import { TimeseriesController } from "./screen_controller/timeseries_controller";
 import { FingerprintScreenController } from "./screen_controller/fingerprint_controller";
-import { NotifyLiveLogItem, ResponseWrapper, Responses } from "./flatbuffers_gen/webmanager";
+import { NotifyLiveLogItem, ResponseWrapper, Responses } from "./generated/flatbuffers/webmanager";
 //import { SensactScreenController } from "./screen_controller/sensact_controller";
 
 const ANSI_ESCAPE = new RegExp("(\\x9B|\\x1B\\[)[0-?]*[ -\\/]*[@-~]");
@@ -79,7 +79,8 @@ class AppController implements AppManagement, WebsocketMessageListener {
         //wenn der Hamburger sichtbar ist, dann das geöffnete Menü schließen
         this.nav_ul.style.display = "none";
       }
-      this.activateScreen(nameInNavAndInMain);};
+      this.activateScreen(nameInNavAndInMain);
+    };
     
     return controllerObject;
   }
@@ -141,7 +142,7 @@ class AppController implements AppManagement, WebsocketMessageListener {
     Html(this.snackbar, "span", [], [], text);
     this.snackbar.style.visibility="visible";
     this.snackbar.style.animation="fadein 0.5s, fadeout 0.5s 2.5s";
-    setTimeout(()=>{
+    this.snackbarTimeout=setTimeout(()=>{
       this.snackbar.style.visibility="hidden";
       this.snackbar.style.animation="";
       this.snackbarTimeout=-1;

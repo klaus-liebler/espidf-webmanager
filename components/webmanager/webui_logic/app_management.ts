@@ -1,4 +1,4 @@
-import { ResponseWrapper, Responses } from "./flatbuffers_gen/webmanager";
+import { ResponseWrapper, Responses } from "./generated/flatbuffers/webmanager";
 import { DialogController, Severity } from "./screen_controller/dialog_controller"
 
 export interface WebsocketMessageListener{
