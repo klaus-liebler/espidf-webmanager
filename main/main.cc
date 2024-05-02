@@ -34,9 +34,9 @@ constexpr auto BUFFER_SIZE{1024};
 uint8_t buffer[BUFFER_SIZE];
 FINGERPRINT::M* fpm{nullptr};
 CANMONITOR::M* canmonitor{nullptr};
-RGBLED::M<1, RGBLED::DeviceType::WS2812>* rgbled{nullptr};
+//RGBLED::M<1, RGBLED::DeviceType::WS2812>* rgbled{nullptr};
 BUZZER::M* buzzer{nullptr};
-
+#ifdef V1
 constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
 constexpr gpio_num_t PIN_485DE{GPIO_NUM_33};
 constexpr gpio_num_t PIN_SCL{GPIO_NUM_12};
@@ -59,6 +59,27 @@ constexpr gpio_num_t PIN_G23{GPIO_NUM_23};
 constexpr gpio_num_t PIN_485DI{GPIO_NUM_25};
 constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_26};
 constexpr gpio_num_t PIN_I2C_IO1{GPIO_NUM_27};
+#else
+constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
+constexpr gpio_num_t PIN_485DE{GPIO_NUM_33};
+constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_12};
+constexpr gpio_num_t PIN_G13{GPIO_NUM_13};
+constexpr gpio_num_t PIN_I2C_SCL{GPIO_NUM_14};
+constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_35};
+constexpr gpio_num_t PIN_485RO{GPIO_NUM_36};
+constexpr gpio_num_t PIN_FINGER_RX{GPIO_NUM_39};
+constexpr gpio_num_t PIN_MOTOR{GPIO_NUM_2};
+constexpr gpio_num_t PIN_CAN_TX{GPIO_NUM_5};
+constexpr gpio_num_t PIN_G16{GPIO_NUM_16};
+constexpr gpio_num_t PIN_CAN_RX{GPIO_NUM_18};
+constexpr gpio_num_t PIN_G21{GPIO_NUM_21};
+constexpr gpio_num_t PIN_LED{GPIO_NUM_22};
+constexpr gpio_num_t PIN_G23{GPIO_NUM_23};
+constexpr gpio_num_t PIN_485DI{GPIO_NUM_25};
+constexpr gpio_num_t PIN_G26{GPIO_NUM_26};
+constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_27};
+#endif
+
 
 constexpr twai_timing_config_t t_config=TWAI_TIMING_CONFIG_125KBITS();
 constexpr twai_general_config_t g_config= TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
@@ -77,12 +98,12 @@ class Webmanager2Fingerprint2Hardware:public MessageReceiver, public FINGERPRINT
         time_t fingerDetected{INT64_MIN};
         static void static_task(void* args){static_cast<Webmanager2Fingerprint2Hardware*>(args)->task();}
         void task(){
-            rgbled->SetPixel(0, CRGB::Red, true);
+            //rgbled->SetPixel(0, CRGB::Red, true);
             while(true){
                 time_t now = millis();
                 bool energizeMotor = now-fingerDetected<1000;
                 gpio_set_level(PIN_MOTOR, !energizeMotor);
-                rgbled->Refresh();
+                //rgbled->Refresh();
                 delayMs(30);
             }
         }
@@ -220,8 +241,8 @@ extern "C" void app_main(void)
     nvs_handle_t nvsHandle;
     nvs_open(NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsHandle);
 
-    rgbled = new RGBLED::M<1, RGBLED::DeviceType::WS2812>();
-    rgbled->Begin(SPI2_HOST, PIN_RGBLED); 
+    //rgbled = new RGBLED::M<1, RGBLED::DeviceType::WS2812>();
+    //rgbled->Begin(SPI2_HOST, PIN_RGBLED); 
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);

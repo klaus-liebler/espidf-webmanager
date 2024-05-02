@@ -1,6 +1,7 @@
 import * as forge from 'node-forge';
 import * as fs from 'fs';
 import * as crypto from "node:crypto";
+import { DEFAULT_COUNTRY, DEFAULT_LOCALITY, DEFAULT_ORGANIZATION, DEFAULT_STATE, ROOT_CA_COMMON_NAME } from './gulpfile_config';
 
 const rootCaExtensions = [{
 	name: 'basicConstraints',
@@ -14,16 +15,16 @@ const rootCaExtensions = [{
 function createSubject(commonName: string):forge.pki.CertificateField[] {
 	return [{
 		shortName: 'C',
-		value: 'DE'
+		value: DEFAULT_COUNTRY
 	}, {
 		shortName: 'ST',
-		value: 'NRW'
+		value: DEFAULT_STATE
 	}, {
 		shortName: 'L',
-		value: 'Greven'
+		value: DEFAULT_LOCALITY
 	}, {
 		shortName: 'O',
-		value: 'Klaus Liebler'//hier muss vermutlich was stehen
+		value: DEFAULT_ORGANIZATION//hier muss vermutlich was stehen
 	}, {
 		shortName: 'OU',
 		value: 'none'//hier muss vermutlich was stehen
@@ -95,7 +96,7 @@ function certHelper(setPrivateKeyInCertificate:boolean, subject:forge.pki.Certif
 }
 
 export function CreateRootCA() {
-	const subjectAndIssuer = createSubject("AAA Klaus Liebler Root CA");
+	const subjectAndIssuer = createSubject(ROOT_CA_COMMON_NAME);
 	return certHelper(
 		true,//necessary, found out in tests
 		subjectAndIssuer,

@@ -6,11 +6,11 @@ dependencies:
       type: service
     version: 0.1.1
   espressif/mdns:
-    component_hash: d96d277207c4fec77ec290b7a8b0ca4043e10f407df0ff6aa52e54a94f0c54a5
+    component_hash: d8ae7aa491ff97aea1d00d514a1de42cdbaaf1bce10df183968fa5594b904de7
     source:
       service_url: https://api.components.espressif.com/
       type: service
-    version: 1.2.4
+    version: 1.2.5
   espressif/onewire_bus:
     component_hash: 4da8596055cfe301370c0bb2aa716e65dc3b7148e64f84bcc9f76693b3a32aa9
     source:
@@ -21,7 +21,7 @@ dependencies:
     component_hash: null
     source:
       type: idf
-    version: 5.1.2
-manifest_hash: 25a0d755c039837a648e2cf28582f968f4ca3cfaa84636831588cfe07379938d
+    version: 5.2.1
+manifest_hash: e329a553ea0a35c7eb39c395cce775fe0a5c1f589d62ccee4a5f3c53be9091c2
 target: esp32
 version: 1.0.0
