@@ -20,10 +20,9 @@
     export var app: IAppManagement
     var rsd: ResponseSystemData
 
-    let otaFiles:FileList;
-    let uploadPercent:string="0";
+    let otaFiles: FileList
+    let uploadPercent: string = '0'
 
-    
     export const M = new (class implements IWebsocketMessageListener, IMountEventListener {
         constructor(private appManagement: IAppManagement) {}
         public sendRequestRestart() {
@@ -35,7 +34,6 @@
         }
 
         public startUpload() {
-            
             if (otaFiles.length == 0) {
                 this.appManagement.showOKDialog(Severity.ERROR, 'No file selected!')
                 return
@@ -61,7 +59,6 @@
 
             xhr.upload.onprogress = (e: ProgressEvent) => {
                 uploadPercent = ((e.loaded / e.total) * 100).toFixed(0)
-                
             }
             console.log(`Trying to POST ${UPLOAD_URL}`)
             xhr.open('POST', UPLOAD_URL, true)
@@ -85,7 +82,7 @@
 
         onMount(): () => void {
             var unregisterer = app.registerWebsocketMessageTypes(M, Responses.ResponseSystemData)
-            console.info("SystemInfo onMount")
+            console.info('SystemInfo onMount')
             this.sendRequestSystemdata()
             return unregisterer
         }
@@ -102,17 +99,17 @@
 
     function calcKibibyte(size: number | undefined): string {
         if (size == undefined) return 'Unknown'
-        return size / 1024 + 'kib'
+        return `${size / 1024} Kibibyte`
     }
 
-    function localeDate(){
-        if(!rsd) return "";
+    function localeDate() {
+        if (!rsd) return ''
         return new Date(Number(1000n * rsd?.secondsEpoch())).toLocaleString('de-DE', MyFavouriteDateTimeFormat)
     }
 
-    function appPartitionIndices():number[]{
-        var arr = Array.from(Array(rsd.partitionsLength()).keys()).filter((i) => rsd.partitions(i)?.type() == 0);
-        return arr;
+    function appPartitionIndices(): number[] {
+        var arr = Array.from(Array(rsd.partitionsLength()).keys()).filter((i) => rsd.partitions(i)?.type() == 0)
+        return arr
     }
 </script>
 
@@ -133,18 +130,19 @@
     </thead>
     <tbody>
         {#if rsd}
-        {#each Array.from(Array(rsd.partitionsLength()).keys()).filter((i) => rsd.partitions(i)?.type() == 0) as i}
-            <tr>
-                <td>{rsd.partitions(i)?.label()}</td>
-                <td>{findPartitionSubtype(rsd.partitions(i)?.type(), rsd.partitions(i)?.subtype())}</td>
-                <td>{calcKibibyte(rsd.partitions(i)?.size())}</td>
-                <td>{findPartitionState(rsd.partitions(i)?.otaState())}</td>
-                <td>{rsd.partitions(i)?.running().toString()}</td>
-                <td>{partitionString(rsd.partitions(i)?.appName(), '<undefined>')}</td>
-                <td>{partitionString(rsd.partitions(i)?.appVersion(), '<undefined>')}</td>
-                <td>{partitionString(rsd.partitions(i)?.appDate(), '<undefined>')}</td>
-                <td>{partitionString(rsd.partitions(i)?.appTime(), '<undefined>')}</td></tr>
-        {/each}
+            {#each Array.from(Array(rsd.partitionsLength()).keys()).filter((i) => rsd.partitions(i)?.type() == 0) as i}
+                <tr>
+                    <td>{rsd.partitions(i)?.label()}</td>
+                    <td>{findPartitionSubtype(rsd.partitions(i)?.type(), rsd.partitions(i)?.subtype())}</td>
+                    <td>{calcKibibyte(rsd.partitions(i)?.size())}</td>
+                    <td>{findPartitionState(rsd.partitions(i)?.otaState())}</td>
+                    <td>{rsd.partitions(i)?.running().toString()}</td>
+                    <td>{partitionString(rsd.partitions(i)?.appName(), '<undefined>')}</td>
+                    <td>{partitionString(rsd.partitions(i)?.appVersion(), '<undefined>')}</td>
+                    <td>{partitionString(rsd.partitions(i)?.appDate(), '<undefined>')}</td>
+                    <td>{partitionString(rsd.partitions(i)?.appTime(), '<undefined>')}</td></tr
+                >
+            {/each}
         {/if}
     </tbody>
 </table>
@@ -159,13 +157,13 @@
     </thead>
     <tbody>
         {#if rsd}
-        {#each Array.from(Array(rsd.partitionsLength()).keys()).filter((i) => rsd.partitions(i)?.type() == 1) as i}
-            <tr>
-                <td>{rsd.partitions(i)?.label()}</td>
-                <td>{findPartitionSubtype(rsd.partitions(i)?.type(), rsd.partitions(i)?.subtype())}</td>
-                <td>{calcKibibyte(rsd.partitions(i)?.size())}</td>
-            </tr>
-        {/each}
+            {#each Array.from(Array(rsd.partitionsLength()).keys()).filter((i) => rsd.partitions(i)?.type() == 1) as i}
+                <tr>
+                    <td>{rsd.partitions(i)?.label()}</td>
+                    <td>{findPartitionSubtype(rsd.partitions(i)?.type(), rsd.partitions(i)?.subtype())}</td>
+                    <td>{calcKibibyte(rsd.partitions(i)?.size())}</td>
+                </tr>
+            {/each}
         {/if}
     </tbody>
 </table>
@@ -179,21 +177,19 @@
     </thead>
     <tbody>
         {#if rsd}
-            
-
-        <tr><td>Real Time Clock</td><td>{localeDate() + ' [' + rsd.secondsEpoch().toString() + ' secs since epoch]'}</td></tr>
-        <tr><td>Uptime [secs]</td><td>{rsd.secondsUptime().toString()}</td></tr>
-        <tr><td>Free Heap [byte]</td><td>{rsd.freeHeap()}</td></tr>
-        <tr><td>MAC Address WIFI_STA</td><td>{mac6_2_string(rsd.macAddressWifiSta())}</td></tr>
-        <tr><td>MAC Address WIFI_SOFTAP</td><td>{mac6_2_string(rsd.macAddressWifiSoftap())}</td></tr>
-        <tr><td>MAC Address BT</td><td>{mac6_2_string(rsd.macAddressBt())}</td></tr>
-        <tr><td>MAC Address ETH</td><td>{mac6_2_string(rsd.macAddressEth())}</td></tr>
-        <tr><td>MAC Address IEEE802154</td><td>{mac6_2_string(rsd.macAddressIeee802154())}</td></tr>
-        <tr><td>Chip Model</td><td>{findChipModel(rsd.chipModel())}</td></tr>
-        <tr><td>Chip Features</td><td>{findChipFeatures(rsd.chipFeatures())}</td></tr>
-        <tr><td>Chip Revision</td><td>{rsd.chipRevision()}</td></tr>
-        <tr><td>Chip Cores</td><td>{rsd.chipCores()}</td></tr>
-        <tr><td>Chip Temperature</td><td>{rsd.chipTemperature().toLocaleString() + '°C'}</td></tr>
+            <tr><td>Real Time Clock</td><td>{localeDate() + ' [' + rsd.secondsEpoch().toString() + ' secs since epoch]'}</td></tr>
+            <tr><td>Uptime [secs]</td><td>{rsd.secondsUptime().toString()}</td></tr>
+            <tr><td>Free Heap [byte]</td><td>{rsd.freeHeap()}</td></tr>
+            <tr><td>MAC Address WIFI_STA</td><td>{mac6_2_string(rsd.macAddressWifiSta())}</td></tr>
+            <tr><td>MAC Address WIFI_SOFTAP</td><td>{mac6_2_string(rsd.macAddressWifiSoftap())}</td></tr>
+            <tr><td>MAC Address BT</td><td>{mac6_2_string(rsd.macAddressBt())}</td></tr>
+            <tr><td>MAC Address ETH</td><td>{mac6_2_string(rsd.macAddressEth())}</td></tr>
+            <tr><td>MAC Address IEEE802154</td><td>{mac6_2_string(rsd.macAddressIeee802154())}</td></tr>
+            <tr><td>Chip Model</td><td>{findChipModel(rsd.chipModel())}</td></tr>
+            <tr><td>Chip Features</td><td>{findChipFeatures(rsd.chipFeatures())}</td></tr>
+            <tr><td>Chip Revision</td><td>{rsd.chipRevision()}</td></tr>
+            <tr><td>Chip Cores</td><td>{rsd.chipCores()}</td></tr>
+            <tr><td>Chip Temperature</td><td>{rsd.chipTemperature().toLocaleString() + '°C'}</td></tr>
         {/if}
     </tbody>
 </table>
@@ -212,7 +208,7 @@
         </tr>
         <tr>
             <td>3.) See Progress</td>
-            <td><progress value="{uploadPercent}" max="100"></progress><span>{'Progress: ' + uploadPercent + '%'}</span></td>
+            <td><progress value={uploadPercent} max="100"></progress><span>{'Progress: ' + uploadPercent + '%'}</span></td>
         </tr>
         <tr>
             <td>4.) Wait</td>

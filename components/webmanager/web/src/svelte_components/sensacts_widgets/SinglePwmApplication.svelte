@@ -1,0 +1,1 @@
+<div class='app'><div><h2>This is SinglePwm</h2><p>1234</p></div><div class='controls'><input class='toggle' type='checkbox' /></div></div>

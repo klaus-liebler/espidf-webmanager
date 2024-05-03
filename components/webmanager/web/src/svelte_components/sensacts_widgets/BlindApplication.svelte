@@ -1,46 +1,36 @@
 <script lang="ts">
-export class BlindApplication extends SensactApplication {
-  constructor(applicationId: ApplicationId, applicationKey: string, applicationDescription: string,) { super(applicationId, applicationKey, applicationDescription) }
+    import { ApplicationId } from '../../generated/flatbuffers/application-id'
+    import * as x from '../../generated/sensact/sendCommandImplementation_copied_during_build'
+    export var DisplayName = ''
+    export var AppId:ApplicationId = 0
 
-  onStop(input: HTMLInputElement) {
-    x.SendSTOPCommand(this.applicationId);
-    console.log(`blind_stop ${this.applicationId}`);
-  }
+    function up() {
+        x.SendUPCommand(AppId, 1)
+        console.log(`blind_up ${AppId}`)
+        //e.stopPropagation();
+    }
 
-  onUp(input: HTMLInputElement) {
-    
-  }
+    function stop() {
+        x.SendSTOPCommand(AppId)
+        console.log(`blind_stop ${AppId}`)
+        //e.stopPropagation();
+    }
 
-  onDown(input: HTMLInputElement) {
-    x.SendDOWNCommand(this.applicationId, 1);
-    console.log(`blind_down ${this.applicationId}`);
-  }
-
-  renderHtmlUi(parent: HTMLElement): void {
-    let panel = <HTMLElement>T(parent, "BlindApplication");
-    this.renderBase(panel);
-    let up: HTMLInputElement = <HTMLInputElement>panel.children[1]!.children[0]!;
-    let stop: HTMLInputElement = <HTMLInputElement>panel.children[1]!.children[1]!;
-    let down: HTMLInputElement = <HTMLInputElement>panel.children[1]!.children[2]!;
-    
-    up.onclick = (e) => {
-      x.SendUPCommand(this.applicationId, 1);
-      console.log(`blind_up ${this.applicationId}`);
-      e.stopPropagation();
-    };
-    stop.onclick = (e) => {
-      x.SendSTOPCommand(this.applicationId);
-      console.log(`blind_stop ${this.applicationId}`);
-      e.stopPropagation();
-    };
-    down.onclick = (e) => {
-      x.SendDOWNCommand(this.applicationId, 1);
-      console.log(`blind_down ${this.applicationId}`);
-      e.stopPropagation();
-    };
-
-    
-  }
-
+    function down() {
+        x.SendDOWNCommand(AppId, 1)
+        console.log(`blind_down ${AppId}`)
+        //e.stopPropagation();
+    }
 </script>
-<div class='app'><div><h2></h2><p></p></div><div><button>⏶</button><button>⏹</button><button>⏷</button></div></div>
+
+<div class="app">
+    <div>
+        <h2>{DisplayName}</h2>
+        <p>{ApplicationId[AppId]}</p>
+    </div>
+    <div>
+        <button on:click={() => up()}>⏶</button>
+        <button on:click={() => stop()}>⏹</button>
+        <button on:click={() => down()}>⏷</button>
+    </div>
+</div>

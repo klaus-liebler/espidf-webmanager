@@ -23,4 +23,4 @@
     })
 </script>
 
-<div bind:this={portfolio} style="width: 600px; height:400px" />
+<div bind:this={portfolio} style="width: 600px; height:400px"></div>

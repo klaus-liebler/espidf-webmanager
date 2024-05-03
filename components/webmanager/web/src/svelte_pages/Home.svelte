@@ -8,7 +8,7 @@
     })()
 </script>
 
-<h2>Home component</h2>
+<h1>Home component</h1>
 
 <p>
     This sample shows how to set up the router with minimum functionality. <br />

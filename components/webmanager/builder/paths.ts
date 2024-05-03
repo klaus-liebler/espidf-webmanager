@@ -32,10 +32,10 @@ export const TEMPLATE_SENSACT_APPS =                path.join(WEB, "src", "templ
 
 //intermediate and distribution
 export const GENERATED_SENSACT_FBS = path.join(GENERATED, "sensact_fbs");
-export const GENERATED_SENSACT_TS = path.join(GENERATED, "sensact_gen_ts");
-export const GENERATED_FLATBUFFERS_TS = path.join(GENERATED, "flatbuffers_gen_ts");
-export const GENERATED_FLATBUFFERS_CPP = path.join(GENERATED, "flatbuffers_gen_cpp");
-export const GENERATED_USERSETTINGS = path.join(GENERATED, "usersettings_gen");
+export const GENERATED_SENSACT_TS = path.join(GENERATED, "sensact_ts");
+export const GENERATED_FLATBUFFERS_TS = path.join(GENERATED, "flatbuffers_ts");
+export const GENERATED_FLATBUFFERS_CPP = path.join(GENERATED, "flatbuffers_cpp");
+export const GENERATED_USERSETTINGS = path.join(GENERATED, "usersettings");
 
 export const WEB_SRC_GENERATED = path.join(WEB, "src", "generated")
 export const DEST_FLATBUFFERS_TYPESCRIPT_WEBUI = path.join(WEB_SRC_GENERATED, "flatbuffers");

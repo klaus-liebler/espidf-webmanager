@@ -278,14 +278,48 @@ inline const char *EnumNameTimeGranularity(TimeGranularity e) {
 
 enum ApplicationId : uint16_t {
   ApplicationId_ApplicationId_MASTER = 0,
+  ApplicationId_ApplicationId_SNSCT_NODE_HS = 1,
+  ApplicationId_ApplicationId_SNSCT_NODE_UP = 2,
+  ApplicationId_ApplicationId_PUSHB_XX_XXX_3 = 3,
+  ApplicationId_ApplicationId_PUSHB_XX_XXX_4 = 4,
+  ApplicationId_ApplicationId_PUSHB_XX_XXX_5 = 5,
+  ApplicationId_ApplicationId_PUSHB_XX_XXX__6 = 6,
+  ApplicationId_ApplicationId_BLINDB_7 = 7,
+  ApplicationId_ApplicationId_DIM2B_8 = 8,
+  ApplicationId_ApplicationId_POWIT_9 = 9,
+  ApplicationId_ApplicationId_POWIT_10 = 10,
+  ApplicationId_ApplicationId_POWIT_11 = 11,
+  ApplicationId_ApplicationId_POWIT_12 = 12,
+  ApplicationId_ApplicationId_BLIND_XX_XXX_13 = 13,
+  ApplicationId_ApplicationId_PWM___XX_XXX_14 = 14,
+  ApplicationId_ApplicationId_STDBY_XX_XXX_15 = 15,
+  ApplicationId_ApplicationId_SOUND_XX_XXX_0 = 16,
+  ApplicationId_ApplicationId_ROTAR_XX_XXX_0 = 17,
   ApplicationId_ApplicationId_NO_APPLICATION = 65535,
   ApplicationId_MIN = ApplicationId_ApplicationId_MASTER,
   ApplicationId_MAX = ApplicationId_ApplicationId_NO_APPLICATION
 };
 
-inline const ApplicationId (&EnumValuesApplicationId())[2] {
+inline const ApplicationId (&EnumValuesApplicationId())[19] {
   static const ApplicationId values[] = {
     ApplicationId_ApplicationId_MASTER,
+    ApplicationId_ApplicationId_SNSCT_NODE_HS,
+    ApplicationId_ApplicationId_SNSCT_NODE_UP,
+    ApplicationId_ApplicationId_PUSHB_XX_XXX_3,
+    ApplicationId_ApplicationId_PUSHB_XX_XXX_4,
+    ApplicationId_ApplicationId_PUSHB_XX_XXX_5,
+    ApplicationId_ApplicationId_PUSHB_XX_XXX__6,
+    ApplicationId_ApplicationId_BLINDB_7,
+    ApplicationId_ApplicationId_DIM2B_8,
+    ApplicationId_ApplicationId_POWIT_9,
+    ApplicationId_ApplicationId_POWIT_10,
+    ApplicationId_ApplicationId_POWIT_11,
+    ApplicationId_ApplicationId_POWIT_12,
+    ApplicationId_ApplicationId_BLIND_XX_XXX_13,
+    ApplicationId_ApplicationId_PWM___XX_XXX_14,
+    ApplicationId_ApplicationId_STDBY_XX_XXX_15,
+    ApplicationId_ApplicationId_SOUND_XX_XXX_0,
+    ApplicationId_ApplicationId_ROTAR_XX_XXX_0,
     ApplicationId_ApplicationId_NO_APPLICATION
   };
   return values;
@@ -294,6 +328,23 @@ inline const ApplicationId (&EnumValuesApplicationId())[2] {
 inline const char *EnumNameApplicationId(ApplicationId e) {
   switch (e) {
     case ApplicationId_ApplicationId_MASTER: return "ApplicationId_MASTER";
+    case ApplicationId_ApplicationId_SNSCT_NODE_HS: return "ApplicationId_SNSCT_NODE_HS";
+    case ApplicationId_ApplicationId_SNSCT_NODE_UP: return "ApplicationId_SNSCT_NODE_UP";
+    case ApplicationId_ApplicationId_PUSHB_XX_XXX_3: return "ApplicationId_PUSHB_XX_XXX_3";
+    case ApplicationId_ApplicationId_PUSHB_XX_XXX_4: return "ApplicationId_PUSHB_XX_XXX_4";
+    case ApplicationId_ApplicationId_PUSHB_XX_XXX_5: return "ApplicationId_PUSHB_XX_XXX_5";
+    case ApplicationId_ApplicationId_PUSHB_XX_XXX__6: return "ApplicationId_PUSHB_XX_XXX__6";
+    case ApplicationId_ApplicationId_BLINDB_7: return "ApplicationId_BLINDB_7";
+    case ApplicationId_ApplicationId_DIM2B_8: return "ApplicationId_DIM2B_8";
+    case ApplicationId_ApplicationId_POWIT_9: return "ApplicationId_POWIT_9";
+    case ApplicationId_ApplicationId_POWIT_10: return "ApplicationId_POWIT_10";
+    case ApplicationId_ApplicationId_POWIT_11: return "ApplicationId_POWIT_11";
+    case ApplicationId_ApplicationId_POWIT_12: return "ApplicationId_POWIT_12";
+    case ApplicationId_ApplicationId_BLIND_XX_XXX_13: return "ApplicationId_BLIND_XX_XXX_13";
+    case ApplicationId_ApplicationId_PWM___XX_XXX_14: return "ApplicationId_PWM___XX_XXX_14";
+    case ApplicationId_ApplicationId_STDBY_XX_XXX_15: return "ApplicationId_STDBY_XX_XXX_15";
+    case ApplicationId_ApplicationId_SOUND_XX_XXX_0: return "ApplicationId_SOUND_XX_XXX_0";
+    case ApplicationId_ApplicationId_ROTAR_XX_XXX_0: return "ApplicationId_ROTAR_XX_XXX_0";
     case ApplicationId_ApplicationId_NO_APPLICATION: return "ApplicationId_NO_APPLICATION";
     default: return "";
   }
@@ -301,27 +352,117 @@ inline const char *EnumNameApplicationId(ApplicationId e) {
 
 enum Command : int8_t {
   Command_NOP = 0,
+  Command_START_IAP = 1,
+  Command_PING = 2,
+  Command_RESET = 3,
+  Command_START = 4,
+  Command_STOP = 5,
+  Command_UP = 6,
+  Command_DOWN = 7,
+  Command_FORWARD = 8,
+  Command_BACKWARD = 9,
+  Command_LEFT = 10,
+  Command_RIGHT = 11,
+  Command_ON = 12,
+  Command_ON_FILTER = 13,
+  Command_OFF = 14,
+  Command_TOGGLE = 15,
+  Command_TOGGLE_FILTER = 16,
+  Command_TOGGLE_SPECIAL = 17,
+  Command_SET_PARAM = 18,
+  Command_SET_HORIZONTAL_TARGET = 19,
+  Command_STEP_HORIZONTAL = 20,
+  Command_SET_VERTICAL_TARGET = 21,
+  Command_STEP_VERTICAL = 22,
+  Command_SET_LATERAL_TARGET = 23,
+  Command_STEP_LATERAL = 24,
+  Command_HEARTBEAT = 25,
+  Command_SEND_STATUS = 26,
+  Command_SET_RGBW = 27,
+  Command_SET_SIGNAL = 28,
+  Command_SET_PWM = 29,
+  Command_DEMO = 30,
   Command_MIN = Command_NOP,
-  Command_MAX = Command_NOP
+  Command_MAX = Command_DEMO
 };
 
-inline const Command (&EnumValuesCommand())[1] {
+inline const Command (&EnumValuesCommand())[31] {
   static const Command values[] = {
-    Command_NOP
+    Command_NOP,
+    Command_START_IAP,
+    Command_PING,
+    Command_RESET,
+    Command_START,
+    Command_STOP,
+    Command_UP,
+    Command_DOWN,
+    Command_FORWARD,
+    Command_BACKWARD,
+    Command_LEFT,
+    Command_RIGHT,
+    Command_ON,
+    Command_ON_FILTER,
+    Command_OFF,
+    Command_TOGGLE,
+    Command_TOGGLE_FILTER,
+    Command_TOGGLE_SPECIAL,
+    Command_SET_PARAM,
+    Command_SET_HORIZONTAL_TARGET,
+    Command_STEP_HORIZONTAL,
+    Command_SET_VERTICAL_TARGET,
+    Command_STEP_VERTICAL,
+    Command_SET_LATERAL_TARGET,
+    Command_STEP_LATERAL,
+    Command_HEARTBEAT,
+    Command_SEND_STATUS,
+    Command_SET_RGBW,
+    Command_SET_SIGNAL,
+    Command_SET_PWM,
+    Command_DEMO
   };
   return values;
 }
 
 inline const char * const *EnumNamesCommand() {
-  static const char * const names[2] = {
+  static const char * const names[32] = {
     "NOP",
+    "START_IAP",
+    "PING",
+    "RESET",
+    "START",
+    "STOP",
+    "UP",
+    "DOWN",
+    "FORWARD",
+    "BACKWARD",
+    "LEFT",
+    "RIGHT",
+    "ON",
+    "ON_FILTER",
+    "OFF",
+    "TOGGLE",
+    "TOGGLE_FILTER",
+    "TOGGLE_SPECIAL",
+    "SET_PARAM",
+    "SET_HORIZONTAL_TARGET",
+    "STEP_HORIZONTAL",
+    "SET_VERTICAL_TARGET",
+    "STEP_VERTICAL",
+    "SET_LATERAL_TARGET",
+    "STEP_LATERAL",
+    "HEARTBEAT",
+    "SEND_STATUS",
+    "SET_RGBW",
+    "SET_SIGNAL",
+    "SET_PWM",
+    "DEMO",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameCommand(Command e) {
-  if (::flatbuffers::IsOutRange(e, Command_NOP, Command_NOP)) return "";
+  if (::flatbuffers::IsOutRange(e, Command_NOP, Command_DEMO)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesCommand()[index];
 }

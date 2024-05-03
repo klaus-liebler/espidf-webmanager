@@ -30,7 +30,6 @@ export function sendCommandImplementation_template(cb: gulp.TaskFunctionCallback
 }
 
 export function sensactapps_template(cb: gulp.TaskFunctionCallback) {
-  if(!OPTION_SENSACT) return cb();
   var content = fs.readFileSync(P.TEMPLATE_SENSACT_APPS).toString();
   if(OPTION_SENSACT){
     content = content.replace("//TEMPLATE_HERE", fs.readFileSync(path.join(CONFIGURATION_TOOL_GENERATED_PATH, "common", "sensactapps.ts.inc")).toString());

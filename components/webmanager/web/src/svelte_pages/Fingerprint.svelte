@@ -107,13 +107,13 @@
         }
 
         public onMessage(messageWrapper: ResponseWrapper): void {
+            var ret:RET
             switch (messageWrapper.responseType()) {
                 case Responses.ResponseFingerprintSensorInfo:
                     fpSensorInfo = <ResponseFingerprintSensorInfo>messageWrapper.response(new ResponseFingerprintSensorInfo())
                     break
 
-                case Responses.ResponseFingers:
-                    {
+                case Responses.ResponseFingers:{
                         var ff = <ResponseFingers>messageWrapper.response(new ResponseFingers())
                         this.fingerIndex2finger.clear()
                         for (let i = 0; i < ff.fingersLength(); i++) {
@@ -128,7 +128,7 @@
                     break
                 case Responses.ResponseDeleteFinger: {
                     var m = <ResponseDeleteFinger>messageWrapper.response(new ResponseDeleteFinger())
-                    var ret = <RET>m.errorcode()
+                    ret = <RET>m.errorcode()
                     if (ret != RET.OK) {
                         this.appManagement.showOKDialog(Severity.ERROR, `Error while deleting Finger ${m.name()}: ${RET[ret]}.`)
                     } else {
@@ -139,7 +139,7 @@
                 }
                 case Responses.ResponseEnrollNewFinger: {
                     let m = <ResponseEnrollNewFinger>messageWrapper.response(new ResponseEnrollNewFinger())
-                    var ret = <RET>m.errorcode()
+                    ret = <RET>m.errorcode()
                     if (ret != RET.OK) {
                         this.appManagement.showOKDialog(Severity.ERROR, `Enrollment could not be started: ${RET[ret]}`)
                     } else {
@@ -149,7 +149,7 @@
                 }
                 case Responses.NotifyEnrollNewFinger: {
                     let m = <NotifyEnrollNewFinger>messageWrapper.response(new NotifyEnrollNewFinger())
-                    var ret = <RET>m.errorcode()
+                    ret = <RET>m.errorcode()
                     console.log(`NotifyEnrollNewFinger: step=${m.step()}, name=${m.name()}, errorcode=${RET[ret]}`)
                     if (m.step() < 13) {
                         var step = Math.ceil(m.step() / 2)
@@ -202,7 +202,7 @@
         }
 
         public onMount() {
-            var unregisterer = this.appManagement.registerWebsocketMessageTypes(M, Responses.ResponseSystemData)
+            var unregisterer = this.appManagement.registerWebsocketMessageTypes(this, Responses.ResponseSystemData)
             this.appManagement.registerWebsocketMessageTypes(
                 this,
                 Responses.ResponseEnrollNewFinger,
