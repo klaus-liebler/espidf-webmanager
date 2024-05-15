@@ -70,12 +70,12 @@ class Webmanager2Fingerprint2Hardware:public MessageReceiver, public FINGERPRINT
         time_t fingerDetected{INT64_MIN};
         static void static_task(void* args){static_cast<Webmanager2Fingerprint2Hardware*>(args)->task();}
         void task(){
-            rgbled->SetPixel(0, CRGB::Red, true);
+            
             while(true){
                 time_t now = millis();
                 bool energizeMotor = now-fingerDetected<1000;
                 gpio_set_level(PIN_MOTOR, !energizeMotor);
-                rgbled->Refresh();
+                
                 delayMs(30);
             }
         }
@@ -213,8 +213,6 @@ extern "C" void app_main(void)
     nvs_handle_t nvsHandle;
     nvs_open(NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsHandle);
 
-    rgbled = new RGBLED::M<1, RGBLED::DeviceType::WS2812>();
-    rgbled->Begin(SPI2_HOST, PIN_RGBLED); 
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
