@@ -34,7 +34,7 @@
 #include <common-esp32.hh>
 #include <esp_log.h>
 #include <sys/time.h>
-#include "../generated/flatbuffers_gen_cpp/app_generated.h"
+#include "../generated/flatbuffers_cpp/app_generated.h"
 #include "interfaces.hh"
 #include "user_settings.hh"
 
@@ -79,8 +79,8 @@ namespace messagecodes
 
 namespace webmanager
 {
-    extern const char webmanager_html_br_start[] asm("_binary_app_html_br_start");
-    extern const size_t webmanager_html_br_length asm("app_html_br_length");
+    extern const char webmanager_html_br_start[] asm("_binary_index_compressed_br_start");
+    extern const size_t webmanager_html_br_length asm("index_compressed_br_length");
 
     constexpr size_t MAX_AP_NUM = 8;
     constexpr size_t STORAGE_LENGTH{16};
@@ -970,8 +970,8 @@ namespace webmanager
             wifi_config_ap.ap.ssid_len = sprintf((char *)wifi_config_ap.ap.ssid, "%s%02x%02x%02x", accessPointSsid, mac[3], mac[4], mac[5]);
             strcpy((char *)wifi_config_ap.ap.password, accessPointPassword);
 
-            wifi_config_ap.ap.channel = CONFIG_NETWORK_WIFI_AP_CHANNEL;
-            wifi_config_ap.ap.max_connection = CONFIG_NETWORK_AP_MAX_AP_CONN;
+            wifi_config_ap.ap.channel = 0;
+            wifi_config_ap.ap.max_connection = 1;
             wifi_config_ap.ap.authmode = AP_AUTHMODE;
 
             scan_config.ssid = 0;

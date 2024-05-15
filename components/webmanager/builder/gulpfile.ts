@@ -1,205 +1,93 @@
-const debug = true;
-
-
-const esp32HostnamePrefix = "esp32host_";
-
-
-
-/*
-install typescript globally
-install gulp-cli globally
-execute "gulp" in ESP_IDF console (that points to the right python environment)
-
-Um Sensact in der WebUI zu aktivieren/deaktivieren:
-- webui_logic/app.ts ->passend ein- und auskommentieren in der startup()-Methode
-- builder/gulpfile_config.ts ->OPTION_SENSACT o.ä passend setzen
-- flatbuffers/app.fbs -> includes passen ein- und auskommentieren und im "union Message" ebenfalls passend ein- und auskommentieren
-- Hinweis: Keine Veränderungen im HTML/SCSS-Bereich - dort bleibt derzeit immer alles "drin"
-
-Build is complex
-1.) Only once!: Call gulp rootCA (creates a root certificate+private key rootCA.pem.crt+rootCA.pem.privkey in this directory)
-2.) Only once!: Install rootCA certificate in Windows
-  - right click on file rootCA.cert.crt
-  - choose "Install Certificate"
-  - choose Local Computer
-  - Select "Alle Zertifikate in folgendem Speicher speichern"
-  - Click "Durchsuchen"
-  - Select "Vertrauenswürdige Stammzertifizierungsstellen"
-3.) Edit settings above in this file ("hostname" is relevant for correct creation of host certificate for esp32)
-4.) Edit usersettings/usersettings.ts
-5.) Call gulp (among various other things, the rootCA certificate and its private key are read in and used to create/sign a host certificate)
-6.) Build esp-idf project
-
-*/
-
-const DEFAULT_COUNTRY = 'Germany';
-const DEFAULT_STATE = 'NRW';
-const DEFAULT_LOCALITY = 'Greven';
-
-const path = require("node:path");
-import fs from "node:fs";
-import { exec } from "node:child_process";
-import * as os from 'node:os';
-
 import * as gulp from "gulp";
-import * as rollup from "rollup"
-import rollupTypescript from '@rollup/plugin-typescript';
-import * as brotli from 'brotli'
-import terser from '@rollup/plugin-terser';
-import nodeResolve from '@rollup/plugin-node-resolve';
+import fs from "node:fs";
+import os from "node:os";
+import proc from "node:child_process";
+import {getMac} from "./esp32/esp32"
+import {parsePartitions} from "./esp32/partition_parser"
 
-
-import { CodeBuilder, EscapeToVariableName } from "../usersettings/usersettings_base";
-
-import { inlineSource } from 'inline-source';
-import * as sass from "sass";
-import * as htmlMinifier from "html-minifier";
 import * as cert from "./certificates"
-import { getMac } from "./esp32/esp32";
-import * as part from "./esp32/partition_parser"
-import { DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, WEBUI_GENERATED_USERSETTINGS_FILE, GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_FILE, GENERATED_FLATBUFFERS_CPP, FLATBUFFERS_SCHEMA_FILE, GENERATED_FLATBUFFERS_TS, WEBUI_TYPESCRIPT_MAIN_FILE, WEBUI_TSCONFIG_FILE, DIST_WEBUI_RAW, WEBUI_HTMLSCSS_PATH, SCSS_SPA_FILE, HTML_SPA_FILE, DIST_WEBUI_BUNDELED, DIST_WEBUI_COMPRESSED, HTML_SPA_FILE_BROTLI, GENERATED_CERTIFICATES, ROOT_CA_PEM_CRT, ROOT_CA_PEM_PRVTKEY, HOST_CERT_PEM_CRT, HOST_CERT_PEM_PRVTKEY, TESTSERVER_CERT_PEM_CRT, TESTSERVER_CERT_PEM_PRVTKEY, NVS_PART_TOOL, WEBUI_GENERATED_PATH, WEBUI_GENERATED_FLATBUFFERS_DIR } from "./paths";
 import * as snsct from "./gulpfile_sensact"
-import { MyCodeBuilderImpl, writeFileCreateDirLazy } from "./gulpfile_utils";
+
+import {writeFileCreateDirLazy } from "./gulpfile_utils";
 import { usersettings_createPartition, usersettings_distribute_ts, usersettings_generate_cpp_code } from "./gulpfile_usersettings";
-import { COM_PORT } from "./gulpfile_config";
-
-
-
-//Helpers
-
-
+import { COM_PORT, ESP32_HOSTNAME_TEMPLATE } from "./gulpfile_config";
+import * as P from "./paths";
 
 
 function clean(cb: gulp.TaskFunctionCallback) {
-  [DIST_WEBUI_PATH, GENERATED_PATH, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, WEBUI_GENERATED_PATH].forEach((path) => {
+  [P.GENERATED, P.WEB_SRC_GENERATED, P.DEST_FLATBUFFERS_TYPESCRIPT_SERVER].forEach((path) => {
     fs.rmSync(path, { recursive: true, force: true });
   });
-  fs.mkdirSync(WEBUI_GENERATED_PATH, {recursive:true})
   cb();
 }
 
-
-
-
 function flatbuffers_generate_c(cb: gulp.TaskFunctionCallback) {
-  exec(`flatc -c --gen-all -o ${GENERATED_FLATBUFFERS_CPP} ${FLATBUFFERS_SCHEMA_FILE}`, (err, stdout, stderr) => {
+  proc.exec(`flatc -c --gen-all -o ${P.GENERATED_FLATBUFFERS_CPP} ${P.FLATBUFFERS_SCHEMA_PATH}`, (err, stdout, stderr) => {
+    stdout
+    stderr
     cb(err);
   });
 }
 
 function flatbuffers_generate_ts(cb: gulp.TaskFunctionCallback) {
-  exec(`flatc -T --gen-all --ts-no-import-ext -o ${GENERATED_FLATBUFFERS_TS} ${FLATBUFFERS_SCHEMA_FILE}`, (err, stdout, stderr) => {
+  proc.exec(`flatc -T --gen-all --ts-no-import-ext -o ${P.GENERATED_FLATBUFFERS_TS} ${P.FLATBUFFERS_SCHEMA_PATH}`, (err, stdout, stderr) => {
+    stdout
+    stderr
     cb(err);
   });
 }
 
 function flatbuffers_distribute_ts(cb: gulp.TaskFunctionCallback) {
-  fs.cpSync(GENERATED_FLATBUFFERS_TS, WEBUI_GENERATED_FLATBUFFERS_DIR, { recursive: true });
-  fs.cpSync(GENERATED_FLATBUFFERS_TS, DEST_FLATBUFFERS_TYPESCRIPT_SERVER, { recursive: true });
+  fs.cpSync(P.GENERATED_FLATBUFFERS_TS, P.DEST_FLATBUFFERS_TYPESCRIPT_WEBUI, { recursive: true });
+  fs.cpSync(P.GENERATED_FLATBUFFERS_TS, P.DEST_FLATBUFFERS_TYPESCRIPT_SERVER, { recursive: true });
   cb();
 }
 
-
-
-function typescriptCompile(cb: gulp.TaskFunctionCallback) {
-  return rollup
-  .rollup({
-    input: WEBUI_TYPESCRIPT_MAIN_FILE,
-    plugins: [
-      rollupTypescript({ tsconfig: WEBUI_TSCONFIG_FILE }),
-      nodeResolve()
-    ]
-  })
-  .then(bundle => {
-    return bundle.write({
-      file: DIST_WEBUI_RAW + '/app.js',
-      format: 'iife',
-      name: 'MyApp',
-      sourcemap: debug ? "inline" : false,
-      plugins: [terser()]
-    });
-  });
-}
-
-function scssTranspile(cb: gulp.TaskFunctionCallback) {
-  var result = sass.compile(path.join(WEBUI_HTMLSCSS_PATH, SCSS_SPA_FILE), { style: "compressed" });
-  writeFileCreateDirLazy(path.join(DIST_WEBUI_RAW, "app.css"), result.css, cb);
-}
-
-const htmlMinifyOptions = {
-  includeAutoGeneratedTags: true,
-  removeAttributeQuotes: true,
-  removeComments: true,
-  removeRedundantAttributes: true,
-  removeScriptTypeAttributes: true,
-  removeStyleLinkTypeAttributes: true,
-  sortClassName: true,
-  useShortDoctype: true,
-  collapseWhitespace: true
-};
-
-function htmlInline(cb: any) {
-  inlineSource(path.join(WEBUI_HTMLSCSS_PATH, HTML_SPA_FILE), {
-    compress: false,//needs to be false, as (2023-11-17), I get an SyntaxError: Unexpected token: punc (.)
-    rootpath: DIST_WEBUI_RAW
-  }).then((html) => { writeFileCreateDirLazy(path.join(DIST_WEBUI_BUNDELED, HTML_SPA_FILE), html, cb) });
-}
-function htmlMinify(cb: any) {
-  let html = htmlMinifier.minify(fs.readFileSync(path.join(DIST_WEBUI_BUNDELED, HTML_SPA_FILE)).toString(), htmlMinifyOptions);
-  writeFileCreateDirLazy(path.join(DIST_WEBUI_COMPRESSED, HTML_SPA_FILE), html, cb);
-}
-
-function htmlBrotli(cb: any) {
-  let compressed = brotli.compress(fs.readFileSync(path.join(DIST_WEBUI_COMPRESSED, HTML_SPA_FILE)));
-  writeFileCreateDirLazy(path.join(DIST_WEBUI_COMPRESSED, HTML_SPA_FILE_BROTLI), compressed, cb);
-}
 
 exports.build = gulp.series(
   clean,
   usersettings_generate_cpp_code,
   usersettings_distribute_ts,
   usersettings_createPartition,
-  snsct.fetchGeneratedFlatbufferCppSources,
+  snsct.fetchGeneratedFlatbufferSources,
   snsct.sendCommandImplementation_template,
   snsct.sensactapps_template,
   flatbuffers_generate_c,
   flatbuffers_generate_ts,
   flatbuffers_distribute_ts,
-  scssTranspile,
-  typescriptCompile,
-  htmlInline,
-  htmlMinify,
-  htmlBrotli
   );
   
   exports.clean = clean;
   exports.rootCA = (cb: gulp.TaskFunctionCallback) => {
     let CA = cert.CreateRootCA();
-    writeFileCreateDirLazy(path.join(GENERATED_CERTIFICATES, ROOT_CA_PEM_CRT), CA.certificate);
-    writeFileCreateDirLazy(path.join(GENERATED_CERTIFICATES, ROOT_CA_PEM_PRVTKEY), CA.privateKey, cb);
+    writeFileCreateDirLazy(P.ROOT_CA_PEM_CRT, CA.certificate);
+    writeFileCreateDirLazy(P.ROOT_CA_PEM_PRVTKEY, CA.privateKey, cb);
   }
   
   exports.certificates = (cb: gulp.TaskFunctionCallback) => {
-    const hostname = fs.readFileSync("hostname.txt").toString();//esp32host_2df5c8
+    const hostname = fs.readFileSync(P.HOSTNAME_FILE).toString();//esp32host_2df5c8
     const this_pc_name = os.hostname();
-    let caCertPath = path.join(GENERATED_CERTIFICATES, ROOT_CA_PEM_CRT);
-    let caPrivkeyPath = path.join(GENERATED_CERTIFICATES, ROOT_CA_PEM_PRVTKEY);
-    let hostCert = cert.CreateCert(hostname, caCertPath, caPrivkeyPath);
-    writeFileCreateDirLazy(path.join(GENERATED_CERTIFICATES, HOST_CERT_PEM_CRT), hostCert.certificate);
-    writeFileCreateDirLazy(path.join(GENERATED_CERTIFICATES, HOST_CERT_PEM_PRVTKEY), hostCert.privateKey, cb);
-    let testserverCert = cert.CreateCert(this_pc_name, caCertPath, caPrivkeyPath);
-    writeFileCreateDirLazy(path.join(GENERATED_CERTIFICATES, TESTSERVER_CERT_PEM_CRT), testserverCert.certificate);
-    writeFileCreateDirLazy(path.join(GENERATED_CERTIFICATES, TESTSERVER_CERT_PEM_PRVTKEY), testserverCert.privateKey, cb);
+    let hostCert = cert.CreateCert(hostname, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
+    writeFileCreateDirLazy(P.HOST_CERT_PEM_CRT, hostCert.certificate);
+    writeFileCreateDirLazy(P.HOST_CERT_PEM_PRVTKEY, hostCert.privateKey, cb);
+    let testserverCert = cert.CreateCert(this_pc_name, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
+    writeFileCreateDirLazy(P.TESTSERVER_CERT_PEM_CRT, testserverCert.certificate);
+    writeFileCreateDirLazy(P.TESTSERVER_CERT_PEM_PRVTKEY, testserverCert.privateKey, cb);
   }
   
-  exports.getmac = async (cb: gulp.TaskFunctionCallback) => {
-    return getMac(COM_PORT, esp32HostnamePrefix);
+  exports.gethostname = async (cb: gulp.TaskFunctionCallback) => {
+    var mac= await getMac(COM_PORT);
+    console.log(`The MAC adress is ${mac.toString()}`);
+    var hostname = ESP32_HOSTNAME_TEMPLATE(mac);
+    console.log(`The Hostname will be ${hostname}`);
+    writeFileCreateDirLazy(P.HOSTNAME_FILE, hostname, cb);
   }
+
   
   exports.parsepart = async (cb: gulp.TaskFunctionCallback) => {
     const partitionfile = fs.readFileSync("./partition-table.bin");
     
-    var res= part.parse(partitionfile);
+    var res= parsePartitions(partitionfile);
     res.forEach(v=>{
       console.log(v.toString());
     })

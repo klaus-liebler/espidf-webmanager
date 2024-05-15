@@ -12,7 +12,7 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "../generated/flatbuffers_gen_cpp/app_generated.h"
+#include "../generated/flatbuffers_cpp/app_generated.h"
 #include "interfaces.hh"
 #include <esp_log.h>
 #define TAG "USET"
@@ -72,7 +72,7 @@ namespace webmanager
 
     
 
-#include "../generated/usersettings_gen/usersettings_config.inc"
+#include "../generated/usersettings/usersettings_config.hh.inc"
 
 
 

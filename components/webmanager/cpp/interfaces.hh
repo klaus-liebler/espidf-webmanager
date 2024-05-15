@@ -1,7 +1,7 @@
 #pragma once
 
 #include <esp_err.h>
-#include "../generated/flatbuffers_gen_cpp/app_generated.h"
+#include "../generated/flatbuffers_cpp/app_generated.h"
 
 class MessageSender{
     public:

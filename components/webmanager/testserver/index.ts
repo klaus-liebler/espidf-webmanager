@@ -1,15 +1,13 @@
-
-import https from "node:https";
 import http from "node:http";
 import * as fs from "node:fs";
 import * as flatbuffers from 'flatbuffers';
 import { WebSocketServer, WebSocket, RawData } from "ws";
-import { ResponseSystemData } from "./flatbuffers_gen/webmanager/response-system-data";
-import { PartitionInfo } from "./flatbuffers_gen/webmanager/partition-info";
-import { Mac6, } from "./flatbuffers_gen/webmanager/mac6";
-import { NotifyLiveLogItem } from "./flatbuffers_gen/webmanager/notify-live-log-item";
-import { AccessPoint } from "./flatbuffers_gen/webmanager/access-point";
-import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./flatbuffers_gen/webmanager";
+import { ResponseSystemData } from "./generated/flatbuffers/webmanager/response-system-data"
+import { PartitionInfo } from "./generated/flatbuffers/webmanager/partition-info";
+import { Mac6, } from "./generated/flatbuffers/webmanager/mac6";
+import { NotifyLiveLogItem } from "./generated/flatbuffers/webmanager/notify-live-log-item";
+import { AccessPoint } from "./generated/flatbuffers/webmanager/access-point";
+import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, NotifyEnrollNewFinger, RequestEnrollNewFinger, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./generated/flatbuffers/webmanager";
 import { createTimeseries } from "./timeseries_generator";
 
 
@@ -66,14 +64,43 @@ function sendResponseFingers(ws: WebSocket) {
     ws.send(b.asUint8Array());
 }
 
-const AP_GOOD="Connectable AP";
-const AP_BAD="Non connectable AP";
+function sendNotifyEnrollNewFinger(ws:WebSocket, step:number, index:number, name:string, delay_ms:number){
+    
+    setTimeout(() => {
+        console.log(`sendNotifyEnrollNewFinger step=${step}, index=${index}, name=${name}`)
+        let b = new flatbuffers.Builder(1024);
+        b.finish(ResponseWrapper.createResponseWrapper(b, Responses.NotifyEnrollNewFinger, NotifyEnrollNewFinger.createNotifyEnrollNewFinger(b, b.createString(name), index, step, 0)));
+        ws.send(b.asUint8Array());
+    }, delay_ms);
+
+}
+
+
+function sendResponseEnrollNewFinger(ws:WebSocket, req:RequestEnrollNewFinger){
+    var fpName= req.name();
+    console.log(`sendResponseEnrollNewFinger name=${fpName}`)
+    let b = new flatbuffers.Builder(1024);
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseEnrollNewFinger, ResponseEnrollNewFinger.createResponseEnrollNewFinger(b, 0)));
+    ws.send(b.asUint8Array());
+    for(var step=0; step<16;step++){
+        sendNotifyEnrollNewFinger(ws, step, 42, fpName, step*500+2000);
+    }
+}
+
+const AP_GOOD="Connect to AP -50dB Auth=2";
+const AP_BAD="Connect to AP -100dB Auth=2";
 
 function sendResponseWifiAccesspoints(ws: WebSocket) {
     let b = new flatbuffers.Builder(1024);
-    let ap0Offset = AccessPoint.createAccessPoint(b, b.createString(AP_GOOD), 11, -72, 2);
-    let ap1Offset = AccessPoint.createAccessPoint(b, b.createString(AP_BAD), 11, -62, 2);
-    let accesspointsOffset = ResponseNetworkInformation.createAccesspointsVector(b, [ap0Offset, ap1Offset]);
+
+    let accesspointsOffset = ResponseNetworkInformation.createAccesspointsVector(b, [
+        AccessPoint.createAccessPoint(b, b.createString(AP_BAD), 11, -66, 2),
+        AccessPoint.createAccessPoint(b, b.createString(AP_GOOD), 11, -50, 2),
+        AccessPoint.createAccessPoint(b, b.createString("AP -76dB Auth=0"), 11, -76, 0),
+        AccessPoint.createAccessPoint(b, b.createString("AP -74dB Auth=0"), 11, -74, 0),
+        AccessPoint.createAccessPoint(b, b.createString("AP -66dB Auth=0"), 11, -66, 0),
+        AccessPoint.createAccessPoint(b, b.createString("AP -59dB Auth=0"), 11, -50, 0)
+    ]);
     let r = ResponseNetworkInformation.createResponseNetworkInformation(b, 
         b.createString("MyHostnameKL"), 
         b.createString("MySsidApKL"),  b.createString("Password"), 32,true, b.createString("ssidSta"), 32,43,23,23,accesspointsOffset);
@@ -103,16 +130,16 @@ function sendResponseGetUserSettings(ws: WebSocket, req: RequestGetUserSettings)
     let settingsOffset: number = 0;
     if (groupName == "Group1") {
         settingsOffset = ResponseGetUserSettings.createSettingsVector(b, [
-            SettingWrapper.createSettingWrapper(b, b.createString("Test String Item1"), Setting.StringSetting, StringSetting.createStringSetting(b, b.createString("Test String Item1 Value " + counter))),
-            SettingWrapper.createSettingWrapper(b, b.createString("Test String Itemxyz"), Setting.StringSetting, StringSetting.createStringSetting(b, b.createString("Test String Item2 Value " + counter))),
+            SettingWrapper.createSettingWrapper(b, b.createString("G1_1_S"), Setting.StringSetting, StringSetting.createStringSetting(b, b.createString("Test String Item1 Value " + counter))),
+            SettingWrapper.createSettingWrapper(b, b.createString("G1_2_S"), Setting.StringSetting, StringSetting.createStringSetting(b, b.createString("Test String Item2 Value " + counter))),
         ]);
     }
     else if (groupName == "Group2") {
         settingsOffset = ResponseGetUserSettings.createSettingsVector(b, [
-            SettingWrapper.createSettingWrapper(b, b.createString("Test String sub1item2"), Setting.StringSetting, StringSetting.createStringSetting(b, b.createString("Test String sub1item2 Value"))),
-            SettingWrapper.createSettingWrapper(b, b.createString("Test Integer sub1item2"), Setting.IntegerSetting, IntegerSetting.createIntegerSetting(b, counter)),
-            SettingWrapper.createSettingWrapper(b, b.createString("Test Boolean"), Setting.BooleanSetting, BooleanSetting.createBooleanSetting(b, toggler)),
-            SettingWrapper.createSettingWrapper(b, b.createString("Test Enum"), Setting.EnumSetting, EnumSetting.createEnumSetting(b, counter % 4)),
+            SettingWrapper.createSettingWrapper(b, b.createString("G2_1_S"), Setting.StringSetting, StringSetting.createStringSetting(b, b.createString("Test String sub1item2 Value"))),
+            SettingWrapper.createSettingWrapper(b, b.createString("G2_2_I"), Setting.IntegerSetting, IntegerSetting.createIntegerSetting(b, counter)),
+            SettingWrapper.createSettingWrapper(b, b.createString("G2_3_B"), Setting.BooleanSetting, BooleanSetting.createBooleanSetting(b, toggler)),
+            SettingWrapper.createSettingWrapper(b, b.createString("G2_4_E"), Setting.EnumSetting, EnumSetting.createEnumSetting(b, counter % 4)),
 
         ]);
         counter++;
@@ -196,14 +223,16 @@ function process(buffer: Buffer, ws: WebSocket) {
             break;
         case Requests.RequestFingers:
             setTimeout(()=>sendResponseFingers(ws), 100);
-
+            break;
+        case Requests.RequestEnrollNewFinger: {}
+            setTimeout(()=>sendResponseEnrollNewFinger(ws, <RequestEnrollNewFinger>mw.request(new RequestEnrollNewFinger())), 100);
         default:
             break;
     }
 }
 
-let hostCert =fs.readFileSync("./../certificates/testserver.pem.crt").toString();
-let hostPrivateKey = fs.readFileSync("./../certificates/testserver.pem.prvtkey").toString();
+//let hostCert =fs.readFileSync("./../certificates/testserver.pem.crt").toString();
+//let hostPrivateKey = fs.readFileSync("./../certificates/testserver.pem.prvtkey").toString();
 
 let server = http.createServer((req, res) => {
 //let server = https.createServer({key: hostPrivateKey, cert: hostCert}, (req, res) => {

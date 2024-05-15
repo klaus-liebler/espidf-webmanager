@@ -3,6 +3,7 @@ import { SetOptions } from '@serialport/bindings-interface'
 import { autoDetect } from '@serialport/bindings-cpp'
 import * as util from 'node:util';
 import * as fs from 'node:fs';
+import { ESP32_HOSTNAME_TEMPLATE } from "../gulpfile_config";
 
 interface ESP32Type {
     macAddr(loader:EspLoader): Promise<Uint8Array>;
@@ -44,7 +45,7 @@ class EspLoader {
         data.copy(b, 8);
         while (this.slipDecoder.read() != null) { ; }
         this.slipEncoder.write(b, undefined, ((error: Error | null | undefined) => {
-            console.log(`${n()} Message out ${util.format(b)} and error ${error}`);
+            console.debug(`${n()} Message out ${util.format(b)} and error ${error}`);
         }));
         let timeout = 10;
         while (timeout > 0) {
@@ -65,7 +66,7 @@ class EspLoader {
                     receivedPayload = Buffer.allocUnsafe(receivedSize);
                     b1.copy(receivedPayload, 0, 8, 8 + receivedSize);
                 }
-                console.log(`${n()} Message in  ${util.format(b1)}`);
+                console.debug(`${n()} Message in Received size=${receivedSize} value=${receivedValue}`);
                 return new BootloaderReturn(true, receivedValue, receivedPayload);
             }
             await sleep(50);
@@ -84,14 +85,17 @@ class EspLoader {
         }
         return retries == 0 ? false : true;
     };
-    public readRegister = (reg: number) => this.sendCommandPacketWithSingleNumberValue(EspLoader.ESP_READ_REG, reg);
+    public readRegister(reg: number){
+        return this.sendCommandPacketWithSingleNumberValue(EspLoader.ESP_READ_REG, reg);
+    }
 
     public async readRegisters(baseAddress:number, len:number):Promise<Uint32Array>{
-        var registers = new Uint32Array();
+        var registers = new Uint32Array(len);
         for (let i = 0; i < len; i++) {
             var res = await this.readRegister(baseAddress+i*4);
             registers[i] = res.valid ? res.value : 0;
         }
+        console.log(`ReadRegisters(baseAddress=${baseAddress}) => ${util.format(registers)}`)
         return registers;
     }
 
@@ -188,7 +192,7 @@ class ESP32S3 implements ESP32Type {
     
     async macAddr(loader:EspLoader): Promise<Uint8Array> {
         var efuses = await loader.readRegisters(ESP32S3.MACFUSEADDR, 2);
-        let macAddr = new Uint8Array();
+        let macAddr = new Uint8Array(6);
         let mac0 = efuses[0];
         let mac1 = efuses[1];
         //let mac2 = efuses[2];
@@ -207,14 +211,14 @@ class ESP32S3 implements ESP32Type {
 
 const sleep = async (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms));
 const n = () => new Date().toLocaleTimeString();
-const X02 =(num: number, len = 2) =>{let str = num.toString(16); return "0".repeat(len - str.length) + str;}
+
 
 
 class BootloaderReturn {
     constructor(public readonly valid: boolean, public readonly value: number, public readonly payload: Buffer | null) { }
 }
 
-export async function getMac(comPort: string, hostnamePrefix: string) {
+export async function getMac(comPort: string):Promise<Uint8Array> {
     const portInfo = await autoDetect().list();
     for (var i of portInfo) {
         console.log(`${i.path}; ${i.manufacturer}; ${i.serialNumber}; ${i.pnpId}; ${i.locationId}; ${i.productId}; ${i.vendorId};`);
@@ -233,15 +237,13 @@ export async function getMac(comPort: string, hostnamePrefix: string) {
             break;
     }
     if (esp32type == null) {
-        console.error("No implementation for this ESP32type available")
-        return;
+        console.error("No implementation for this ESP32 type available")
+        return Promise.reject();
     }
+    console.info(`Found a connected ${esp32type.constructor.name}`)
 
-    var mac = await esp32type.macAddr(loader);
-    console.log(`The MAC adress is ${mac.toString()}`);
-    var hostname = (`${hostnamePrefix}${X02(mac[3])}${X02(mac[4])}${X02(mac[5])}`);
-    console.log(`The Hostname will be ${hostname}`);
-    fs.writeFileSync("hostname.txt", hostname);
+    var mac =  await esp32type.macAddr(loader);
+    
     loader.Close();
-
+    return mac;
 }

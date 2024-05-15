@@ -1,27 +1,15 @@
 dependencies:
-  espressif/ds18b20:
-    component_hash: d676429d9f1f686b65ed895e418eb4b331477bcd5d63c27f43dc3d6a2de8f13b
-    source:
-      service_url: https://api.components.espressif.com/
-      type: service
-    version: 0.1.1
   espressif/mdns:
-    component_hash: d96d277207c4fec77ec290b7a8b0ca4043e10f407df0ff6aa52e54a94f0c54a5
+    component_hash: ed10ef031bce505e423c5dbf0fdf2ce7a02df5f9ebffb18df2d6b9852e48817d
     source:
       service_url: https://api.components.espressif.com/
       type: service
-    version: 1.2.4
-  espressif/onewire_bus:
-    component_hash: 4da8596055cfe301370c0bb2aa716e65dc3b7148e64f84bcc9f76693b3a32aa9
-    source:
-      service_url: https://api.components.espressif.com/
-      type: service
-    version: 1.0.1
+    version: 1.3.1
   idf:
     component_hash: null
     source:
       type: idf
-    version: 5.1.2
-manifest_hash: 25a0d755c039837a648e2cf28582f968f4ca3cfaa84636831588cfe07379938d
+    version: 5.2.1
+manifest_hash: 85b116207ebf182fa06597982e2cac0a2793990ca346d06c136c9b0c96e99cfc
 target: esp32
 version: 1.0.0

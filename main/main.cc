@@ -20,9 +20,8 @@
 #include <fingerprint.hh>
 #include <canmonitor.hh>
 #include <interfaces.hh>
-#include <rgbled.hh>
+
 #include <buzzer.hh>
-#include <wifi_softap.hh>
 
 
 #define TAG "MAIN"
@@ -34,7 +33,6 @@ constexpr auto BUFFER_SIZE{1024};
 uint8_t buffer[BUFFER_SIZE];
 FINGERPRINT::M* fpm{nullptr};
 CANMONITOR::M* canmonitor{nullptr};
-RGBLED::M<1, RGBLED::DeviceType::WS2812>* rgbled{nullptr};
 BUZZER::M* buzzer{nullptr};
 
 constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
@@ -63,11 +61,6 @@ constexpr gpio_num_t PIN_I2C_IO1{GPIO_NUM_27};
 constexpr twai_timing_config_t t_config=TWAI_TIMING_CONFIG_125KBITS();
 constexpr twai_general_config_t g_config= TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
 
-RGBLED::BlinkPattern blinkFastRedBlack(CRGB::Red, 300, CRGB::Black, 300); // booting
-RGBLED::BlinkPattern blinkFastGreenBlack(CRGB::Green, 300, CRGB::Black, 300);
-RGBLED::BlinkPattern blinkFastBlueGreen(CRGB::Blue, 300, CRGB::Green, 300);
-RGBLED::BlinkPattern blinkFastYellowRed(CRGB::Yellow, 300, CRGB::Red, 300); // OTA Process
-RGBLED::BlinkPattern flashGreen(CRGB::Green, 100, CRGB::Black, 3000); // Run
 
 
 class Webmanager2Fingerprint2Hardware:public MessageReceiver, public FINGERPRINT::iFingerprintHandler, public CANMONITOR::iCanmonitorHandler{

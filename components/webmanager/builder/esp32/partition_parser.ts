@@ -62,7 +62,7 @@ export class PartitionInfo {
     }
 }
 
-export function parse(binaryPartitionInfo: Buffer):Array<PartitionInfo> {
+export function parsePartitions(binaryPartitionInfo: Buffer):Array<PartitionInfo> {
     let ret:Array<PartitionInfo>=[];
     var md5= createHash('md5');
     if(binaryPartitionInfo.byteLength%32!=0){
