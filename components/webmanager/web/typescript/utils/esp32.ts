@@ -44,11 +44,21 @@ const partitionsubtypesdata = new Map<number, string>([
   [0x82, "ESP_PARTITION_SUBTYPE_DATA_SPIFFS"],// = 0x82,                         
 ]);
 
-export function findPartitionState(ota_state:number): string {
+export function findPartitionState(ota_state:number|undefined): string {
+  if(ota_state===undefined){
+    return "Unknown Partition State"
+  }
   return partitionstate.has(ota_state) ? partitionstate.get(ota_state)! : "Unknown State " + ota_state.toFixed(0);
 }
 
-export function findPartitionSubtype(type:number, subtype:number): string {
+export function partitionString(original: string | null| undefined, def: string) {
+  return original?.charAt(0) == '\0xFF' ? def : original
+}
+
+export function findPartitionSubtype(type:number|undefined, subtype:number|undefined): string {
+  if(type===undefined || subtype==undefined){
+    return "Unknown Partition Type"
+  }
   switch (type) {
     case 0x00:
       return partitionsubtypesapp.has(subtype) ? partitionsubtypesapp.get(subtype)! : "Unknown App Subtype";

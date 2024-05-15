@@ -1,5 +1,5 @@
-import { ApplicationId } from "../flatbuffers/application-id";
-import { BlindApplication, OnOffApplication, SensactApplication, SinglePwmApplication } from "../../option_sensact/sensactapps_base";
+import { ApplicationId } from "../../generated/flatbuffers/application-id";
+import { BlindApplication, OnOffApplication, SensactApplication, SinglePwmApplication } from "../../utils/sensactapps_base";
 
 
 export default function Build():Array<SensactApplication>{
