@@ -39,7 +39,7 @@
 #include "user_settings.hh"
 
 #if (CONFIG_HTTPD_MAX_REQ_HDR_LEN<1024)
-    #error CONFIG_HTTPD_MAX_REQ_HDR_LEN<1024
+    #error CONFIG_HTTPD_MAX_REQ_HDR_LEN<1024 (Max HTTP Request Header Length)
 #endif
 #ifndef CONFIG_ESP_HTTPS_SERVER_ENABLE
     #error "Enable HTTPS in menuconfig"

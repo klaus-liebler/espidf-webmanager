@@ -31,14 +31,15 @@
 
 ### When you use this library for the first time -> Preparation 
 1. Make sure, there is a system environment variable IDF_PATH
-1. install typescript globally
-1. install gulp-cli globally: call `npm install --global gulp-cli`
-1. Open ESP_IDF Terminal (Press F1 and search for "Terminal")
-1. In `components\webmanager\builder` call `npm update` to install all javascript / typescript libraries
-1. In `components\webmanager\web` call `npm update` as well
+1. install typescript globally call `npm install -g typescript`
+2. install gulp-cli globally: call `npm install -g gulp-cli`
+3. Open ESP_IDF Terminal (Press F1 and search for "Terminal")
+4. In `components\webmanager\web` call `npm i` to install all javascript / typescript libraries
+5. 2. In `components\webmanager\testserver` call `npm i` to install all javascript / typescript libraries
+6. In `components\webmanager\builder` call `npm i` to install all javascript / typescript libraries
 
-1. In `components\webmanager\builder` call `gulp rootCA` (creates a root certificate+private key rootCA.pem.crt+rootCA.pem.privkey in this directory)
-1. Install rootCA certificate in Windows
+7. In `components\webmanager\builder` call `gulp rootCA` (creates a root certificate+private key rootCA.pem.crt+rootCA.pem.privkey in this directory)
+8. Install rootCA certificate in Windows
   - right click on file rootCA.cert.crt
   - choose "Install Certificate"
   - choose Local Computer
@@ -48,15 +49,23 @@
   - Click "Next" or "Finish"
 ### When you start a new project that uses this library -> System Configuration
 1. Edit `gulpfile_config.ts` ("hostname" is relevant for correct creation of host certificate for esp32)
+2. Open Menuconfig in esp-idf and set:
+     * Max HTTP Request Header Length ->1024
+     * CONFIG_ESP_HTTPS_SERVER_ENABLE
+     * CONFIG_HTTPD_WS_SUPPORT
+     * Partition Table = Custom Partition Table
+     * Flash Size >=8MB
+     * Detect Flash Size when flashing bootloader
+
 ### When you intend to flash to a new ESP32 microcontroller (with a specific mac adress)
-1. Run `gulp gethostname` (writes file cetificates/hostname.txt with the hostname of esp32, that is derived from mac adress, template see "gulpfile_config.ts". This is done by reading the MAC address of the microcontroller attached via COM port)
-1. Run `gulp certificates` (creates HTTPS certificates for the ESP32 microcontroller and for the testserver on the loacl pc")
+1. In `components\webmanager\builder` call `gulp gethostname` (writes file certificates/esp32_hostname.txt with the hostname of esp32, that is derived from mac adress, template see "gulpfile_config.ts". This is done by reading the MAC address of the microcontroller attached via COM port)
+2. In `components\webmanager\builder` call `gulp certificates` (creates HTTPS certificates for the ESP32 microcontroller and for the testserver on the loacl pc")
 ### When you want to define the settings (Name, Type, default Value), that can be setup in webui
 1. Edit `usersettings/usersettings.ts`
 ### When you want to build the project
-1. Goto `components\webmanager\builder` and call `gulp`
-2. Goto `components\webmanager\web` and call `npm run dev`
-6. Build esp-idf project
+1. In `components\webmanager\builder` call and call `gulp`
+2. In `components\webmanager\web` and call `npm run dev`
+3. Build esp-idf project
 
 ## Deprecated
 execute "gulp" in ESP_IDF console (that points to the right python environment)

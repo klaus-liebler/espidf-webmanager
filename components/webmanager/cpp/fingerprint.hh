@@ -301,7 +301,7 @@ namespace FINGERPRINT
                     ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d, score=%d", fingerIndex, score);
                     if(this->handler) handler->HandleFingerprintDetected(0, fingerIndex, score);
                 }else{
-                    ESP_LOGI(TAG, "AutoIdentify returns %d", (int)ret);
+                    ESP_LOGW(TAG, "AutoIdentify returns %d", (int)ret);
                     if(this->handler) handler->HandleFingerprintDetected((uint8_t)ret, 0, 0);
                 }
             }

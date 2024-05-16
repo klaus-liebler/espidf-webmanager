@@ -1,7 +1,7 @@
-import http from "node:http";
-import * as fs from "node:fs";
-import * as flatbuffers from 'flatbuffers';
-import { WebSocketServer, WebSocket, RawData } from "ws";
+import http from "node:http"
+import * as fs from "node:fs"
+import * as flatbuffers from 'flatbuffers'
+import { WebSocketServer, WebSocket, RawData } from "ws"
 import { ResponseSystemData } from "./generated/flatbuffers/webmanager/response-system-data"
 import { PartitionInfo } from "./generated/flatbuffers/webmanager/partition-info";
 import { Mac6, } from "./generated/flatbuffers/webmanager/mac6";
