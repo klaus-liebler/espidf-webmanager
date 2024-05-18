@@ -8,7 +8,6 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include <string.h>
-#include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include <common-esp32.hh>
 #include <mdns.h>
@@ -22,68 +21,68 @@
 #include <fingerprint.hh>
 #include <canmonitor.hh>
 #include <interfaces.hh>
-
+#include "led_manager.hh"
 #include <buzzer.hh>
 
 #define TAG "MAIN"
+#define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
 #define NVS_FINGER_NAMESPACE "finger"
 
-constexpr auto BUFFER_SIZE{1024};
-uint8_t buffer[BUFFER_SIZE];
 FINGERPRINT::M *fpm{nullptr};
 CANMONITOR::M *canmonitor{nullptr};
 BUZZER::M *buzzer{nullptr};
+LED::M *led{nullptr};
 
 constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
 constexpr gpio_num_t PIN_485DE{GPIO_NUM_33};
-constexpr gpio_num_t PIN_SCL{GPIO_NUM_12};
-constexpr gpio_num_t PIN_I2C_IO2{GPIO_NUM_13};
-constexpr gpio_num_t PIN_SDA{GPIO_NUM_14};
-constexpr gpio_num_t PIN_MOTOR{GPIO_NUM_15};
-constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_23};
-// FIXME: constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_7};
+constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_12};
+constexpr gpio_num_t PIN_IO13{GPIO_NUM_13};
+constexpr gpio_num_t PIN_I2C_SCL{GPIO_NUM_14};
+constexpr gpio_num_t PIN_FINGER_ON{GPIO_NUM_15};
+//constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_35};
 constexpr gpio_num_t PIN_485RO{GPIO_NUM_36};
 constexpr gpio_num_t PIN_FINGER_RX{GPIO_NUM_39};
 
-constexpr gpio_num_t PIN_G4_PU{GPIO_NUM_4};
+constexpr gpio_num_t PIN_MOTOR{GPIO_NUM_2};
+//constexpr gpio_num_t PIN_G4_PU{GPIO_NUM_4};
 constexpr gpio_num_t PIN_CAN_TX{GPIO_NUM_5};
 constexpr gpio_num_t PIN_G16{GPIO_NUM_16};
 constexpr gpio_num_t PIN_CAN_RX{GPIO_NUM_18};
-constexpr gpio_num_t PIN_G19{GPIO_NUM_19};
-constexpr gpio_num_t PIN_G21{GPIO_NUM_21};
-constexpr gpio_num_t PIN_RGBLED{GPIO_NUM_22};
-constexpr gpio_num_t PIN_G23{GPIO_NUM_23};
+//constexpr gpio_num_t PIN_G19{GPIO_NUM_19};
+constexpr gpio_num_t PIN_IO21{GPIO_NUM_21};
+constexpr gpio_num_t PIN_LED{GPIO_NUM_22};
+constexpr gpio_num_t PIN_IO23{GPIO_NUM_23};
 constexpr gpio_num_t PIN_485DI{GPIO_NUM_25};
-constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_26};
-constexpr gpio_num_t PIN_I2C_IO1{GPIO_NUM_27};
+constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_26};
+//constexpr gpio_num_t PIN_IO26{GPIO_NUM_26};
+constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_27};
 
 constexpr twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
 constexpr twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
+
+LED::BlinkPattern SLOW(300, 1700);
+LED::BlinkPattern FAST(200, 200);
 
 class Webmanager2Fingerprint2Hardware : public MessageReceiver, public FINGERPRINT::iFingerprintHandler, public CANMONITOR::iCanmonitorHandler
 {
 private:
     MessageSender *callback{nullptr};
     nvs_handle_t nvsHandle;
-    time_t fingerDetected{INT64_MIN};
-    uint16_t lastFingerDetectedIndex{0};
+    time_t fingerDetected{-1000000};
     static void static_task(void *args) { static_cast<Webmanager2Fingerprint2Hardware *>(args)->task(); }
     void task()
     {
-        bool previousEnergizeMotor{false};
+        ESP_LOGI(TAG, "Central Management Task 'Webmanager2Fingerprint2Hardware' running");
+        buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
+ 
         while (true)
         {
             time_t now = millis();
-            bool energizeMotor = now - fingerDetected < 1000;
-            if(!previousEnergizeMotor && energizeMotor){
-                //positive Flanke!
-                ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d", lastFingerDetectedIndex);
-                buzzer->PlaySong(BUZZER::RINGTONE_SONG::SHORTPOS);
-            }
-            gpio_set_level(PIN_MOTOR, !energizeMotor);
+            bool energizeMotor = (now - fingerDetected) < 1000;
+            gpio_set_level(PIN_MOTOR, energizeMotor);
+            led->SetPixel(energizeMotor);
             buzzer->Loop();
             delayMs(30);
-            previousEnergizeMotor=energizeMotor;
         }
     }
 
@@ -92,8 +91,8 @@ public:
 
     void begin()
     {
-        gpio_set_level(PIN_MOTOR, 1);
-        gpio_set_direction(PIN_MOTOR, GPIO_MODE_INPUT_OUTPUT_OD);
+        gpio_set_level(PIN_MOTOR, 0);
+        gpio_set_direction(PIN_MOTOR, GPIO_MODE_OUTPUT);
         xTaskCreate(static_task, "wm2fp2hw", 4096, this, 10, nullptr);
     }
 
@@ -117,10 +116,15 @@ public:
             callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_NotifyFingerDetected,
                                                 webmanager::CreateNotifyFingerDetected(b, errorCode, finger, score).Union());
         }
-        if (errorCode == 0)
+        if (errorCode == (uint8_t)FINGERPRINT::RET::OK)
         {
             this->fingerDetected = millis();
-            this->lastFingerDetectedIndex=finger;
+            ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d", finger);
+            //buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
+        }
+        else if(errorCode == (uint8_t)FINGERPRINT::RET::FINGER_NOT_FOUND){
+            ESP_LOGW(TAG, "Unknown finger!");
+            //buzzer->PlaySong(BUZZER::RINGTONE_SONG::NEGATIV);
         }
     }
     void HandleEnrollmentUpdate(uint8_t errorCode, uint8_t step, uint16_t fingerIndex, const char *name) override
@@ -203,19 +207,26 @@ public:
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseFingers,
                                                        webmanager::CreateResponseFingersDirect(b, &fingers_vector).Union());
         }
+
+        case webmanager::Requests::Requests_RequestOpenDoor:
+        {
+            this->fingerDetected = millis();
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseOpenDoor,
+                                                       webmanager::CreateResponseOpenDoor(b).Union());
+        }
         default:
-            return ESP_OK;
+            return ESP_FAIL;
         }
     }
 };
 
 extern "C" void app_main(void)
 {
-    esp_err_t ret = nvs_flash_init();
+    esp_err_t ret = nvs_flash_init_partition(NVS_FINGER_PARTITION);
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
+        ESP_ERROR_CHECK(nvs_flash_init_partition(NVS_FINGER_PARTITION));
     }
 
     httpd_handle_t http_server{nullptr};
@@ -230,14 +241,17 @@ extern "C" void app_main(void)
     conf.servercert_len = cert_end - cert_start;
     conf.prvtkey_pem = privkey_start;
     conf.prvtkey_len = privkey_end - privkey_start;
+    conf.httpd.uri_match_fn=httpd_uri_match_wildcard;
 
     // timeseries::M* tsman=timeseries::M::GetSingleton();
     // tsman->Init(&zahl1, &zahl1, &zahl2, &zahl3);
     nvs_handle_t nvsHandle;
-    nvs_open(NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsHandle);
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsHandle));
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
+    led = new LED::M(PIN_LED, true);
+    led->Begin();
 
     Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsHandle);
     w2f->begin();
@@ -249,7 +263,7 @@ extern "C" void app_main(void)
     canmonitor->begin(&t_config, &g_config);
 
     webmanager::M *wman = webmanager::M::GetSingleton();
-    ESP_ERROR_CHECK(wman->Init("ESP32AP_", "password", "esp32host_%02X%02X%02X", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
+    ESP_ERROR_CHECK(wman->Init("ESP32AP_", "password", "finger", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
 
     ESP_ERROR_CHECK(httpd_ssl_start(&http_server, &conf));
     ESP_LOGI(TAG, "HTTPD with SSL started");

@@ -6,7 +6,7 @@ import gulp from "gulp";
 import path from "path";
 import { EscapeToVariableName } from "../usersettings/typescript/utils/usersettings_base";
 import { MyCodeBuilderImpl, writeFileCreateDirLazy } from "./gulpfile_utils";
-import { GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_PATH, DEST_USERSETTINGS_PATH } from "./paths";
+import { GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_PATH, DEST_USERSETTINGS_PATH, NVS_PART_TOOL } from "./paths";
 import UserSettings from "../usersettings/go_here/go_here/usersettings"
 import fs from "node:fs";
 import { COM_PORT, USERSETTINGS_PARTITION_NAME, USERSETTINGS_PARTITION_SIZE_KILOBYTES } from "./gulpfile_config";
@@ -68,8 +68,8 @@ export function usersettings_distribute_ts(cb: gulp.TaskFunctionCallback) {
   cb();
 }
 
-exports.flashusersettings = (cb: gulp.TaskFunctionCallback)=>{
-  proc.exec(`py ${NVS_PART_GEN_TOOL} --port "${COM_PORT}" write_partition --partition-name=${USERSETTINGS_PARTITION_NAME} --input "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.bin")}"`, (err, stdout, stderr) => {
+export function flashusersettings (cb: gulp.TaskFunctionCallback){
+  proc.exec(`py ${NVS_PART_TOOL} --port "${COM_PORT}" write_partition --partition-name=${USERSETTINGS_PARTITION_NAME} --input "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.bin")}"`, (err, stdout, stderr) => {
     cb(err);
   });
 }

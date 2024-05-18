@@ -71,6 +71,6 @@
     "*.inc": "cpp"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM4",
+  "idf.portWin": "COM7",
   "idf.flashBaudRate": "921600"
 }

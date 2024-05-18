@@ -9,7 +9,7 @@ import * as cert from "./certificates"
 import * as snsct from "./gulpfile_sensact"
 
 import {writeFileCreateDirLazy } from "./gulpfile_utils";
-import { usersettings_createPartition, usersettings_distribute_ts, usersettings_generate_cpp_code } from "./gulpfile_usersettings";
+import { flashusersettings, usersettings_createPartition, usersettings_distribute_ts, usersettings_generate_cpp_code } from "./gulpfile_usersettings";
 import { COM_PORT, ESP32_HOSTNAME_TEMPLATE } from "./gulpfile_config";
 import * as P from "./paths";
 
@@ -93,6 +93,8 @@ exports.build = gulp.series(
     })
     cb();
   }
+
+  exports.flashusersettings = flashusersettings;
   
 
   exports.default = exports.build

@@ -5,7 +5,7 @@ import RouterMenu, { IRouteHandler, Route } from "./routermenu";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { IAppManagement, IDialogBodyRenderer, IWebsocketMessageListener } from "./utils/interfaces";
 import { ResponseWrapper, NotifyLiveLogItem, Responses } from "../generated/flatbuffers/webmanager";
-import { DialogController } from "./screen_controller/dialog_controller";
+import { DialogController, FilenameDialog, OkCancelDialog, OkDialog, PasswordDialog } from "./screen_controller/dialog_controller";
 import { Severity, Html, severity2class, severity2symbol } from "./utils/common";
 import { WS_URL } from "./constants";
 import * as flatbuffers from "flatbuffers"
@@ -17,6 +17,7 @@ import { runCarRace } from "./screen_controller/racinggame_controller";
 import { FingerprintScreenController } from "./screen_controller/fingerprint_controller";
 import { SystemScreenController } from "./screen_controller/systemscreen_controller";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
+import { WeeklyScheduleDialog } from "./dialog_controller/weeklyschedule_dialog";
 
 
 
@@ -33,12 +34,12 @@ const MAX_MESSAGE_COUNT = 20;
 
 
 function AddScreenControllers(app: AppController): void {
-  app.AddScreenController("dashboard", new RegExp("^/$"), html`<span>&#127760;</span><span>Home</span>`, DefaultScreenController)
-  //app.AddScreenController("can", new RegExp("^/can$"), html`<span>&#127760;</span><span>Can Monitor</span>`, CanMonitorScreenController)
+  //app.AddScreenController("dashboard", new RegExp("^/$"), html`<span>&#127760;</span><span>Home</span>`, DefaultScreenController)
+  app.AddScreenController("can", new RegExp("^/can$"), html`<span>&#127760;</span><span>Can Monitor</span>`, CanMonitorScreenController)
   app.AddScreenController("system", new RegExp("^/system$"), html`<span>⌘</span><span>System Settings</span>`, SystemScreenController)
   app.AddScreenController("properties", new RegExp("^/properties$"), html`<span>⚙</span><span>Properties</span>`, UsersettingsController)
-  //app.AddScreenController("wifiman", new RegExp("^/wifiman$"), html`<span>📶</span><span>Wifi Manager</span>`, WifimanagerScreenController)
-  app.AddScreenController("timeseries", /^\/timeseries(?:\/(?<id>\w*))?(?:\/(?<val>\d*))?$/, html`<span>📶</span><span>Timeseries</span>`, TimeseriesController)
+  app.AddScreenController("wifiman", new RegExp("^/wifiman$"), html`<span>📶</span><span>Wifi Manager</span>`, WifimanagerScreenController)
+  //app.AddScreenController("timeseries", /^\/timeseries(?:\/(?<id>\w*))?(?:\/(?<val>\d*))?$/, html`<span>📶</span><span>Timeseries</span>`, TimeseriesController)
   app.AddScreenController("finger", new RegExp("^/finger$"), html`<span>👉</span><span>Fingerprint</span>`, FingerprintScreenController)
 }
 
@@ -62,28 +63,40 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
   private mainRef: Ref<HTMLInputElement> = createRef();
   private scroller: Ref<HTMLDivElement> = createRef();
   private scroller_anchor: Ref<HTMLDivElement> = createRef();
-  private dialogController: DialogController;
+  
 
 
   private modal: Ref<HTMLDivElement> = createRef();
+  private dialog: Ref<HTMLDivElement> = createRef();
   private snackbarTimeout: number = -1;
 
-  showDialog(head: string, renderer: IDialogBodyRenderer, pHandler?: (ok: boolean, value: string) => any): void {
-    this.dialogController.showDialog(head, "", renderer, pHandler)
-  }
+
   showEnterFilenameDialog(messageText: string, pHandler?: (ok: boolean, value: string) => any): void {
-    this.dialogController.showEnterFilenameDialog(messageText, pHandler)
+    this.renderAndShowDialog(new FilenameDialog(messageText, pHandler));
   }
   showEnterPasswordDialog(messageText: string, pHandler?: (ok: boolean, value: string) => any): void {
-    this.dialogController.showEnterPasswordDialog(Severity.INFO, messageText, pHandler)
+    this.renderAndShowDialog(new PasswordDialog(messageText, pHandler));
   }
   showOKDialog(pSeverity: Severity, messageText: string, pHandler?: (ok: boolean, value: string) => any): void {
-    this.dialogController.showOKDialog(pSeverity, messageText, pHandler)
+    this.renderAndShowDialog(new OkDialog(pSeverity, messageText, pHandler));
+    
   }
   showOKCancelDialog(pSeverity: Severity, messageText: string, pHandler?: (ok: boolean, value: string) => any): void {
-    this.dialogController.showOKCancelDialog(pSeverity, messageText, pHandler)
+    this.renderAndShowDialog(new OkCancelDialog(pSeverity, messageText, pHandler));
   }
 
+  showWeeklyTimetableDialog(pHandler?: (ok: boolean, value: Uint8Array) => any):void{
+    this.renderAndShowDialog(new WeeklyScheduleDialog(pHandler));
+  }
+
+  showDialog<T extends DialogController>(type: { new(m: IAppManagement, pHandler?: ((ok: boolean, value: string) => any)): T; } , pHandler?: ((ok: boolean, value: string) => any)): void{
+    this.renderAndShowDialog(new type(this, pHandler));
+  }
+
+  private renderAndShowDialog(d:DialogController){
+    render(d.Template(), this.dialog.value!)
+    d.Show();
+  }
 
 
   public SetMain(child: ScreenController, params: RegExpMatchArray) {
@@ -103,13 +116,15 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     return controllerObject
   }
 
+ 
+
   private setModal(state: boolean) {
     this.modal.value!.style.display = state ? "flex" : "none";
   }
 
   private modalSpinnerTimeout() {
     this.setModal(false);
-    this.dialogController.showOKDialog(Severity.ERROR, "Server did not respond");
+    this.showOKDialog(Severity.ERROR, "Server did not respond");
   }
 
   public sendWebsocketMessage(data: ArrayBuffer, messagesToUnlock: Array<Responses> = [Responses.NONE], maxWaitingTimeMs: number = 2000): void {
@@ -117,7 +132,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
       console.info('sendWebsocketMessage --> not OPEN --> buffer')
       //still in connection state -->buffer
       if (this.messageBuffer) {
-        this.dialogController.showOKDialog(Severity.ERROR, `Websocket is still in CONNECTING state and there is already a message in buffer`)
+        this.showOKDialog(Severity.ERROR, `Websocket is still in CONNECTING state and there is already a message in buffer`)
         return;
       }
       this.messageBuffer = new BufferedMessage(data, messagesToUnlock);
@@ -137,7 +152,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
       if (this.modalSpinnerTimeoutHandle) {
         clearTimeout(this.modalSpinnerTimeoutHandle)
       }
-      this.dialogController.showOKDialog(Severity.ERROR, `Error while sending a request to server:${error}`)
+      this.showOKDialog(Severity.ERROR, `Error while sending a request to server:${error}`)
     }
   }
 
@@ -233,7 +248,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
 
   constructor() {
     this.messageType2listener = new Map<number, [IWebsocketMessageListener]>;
-    this.dialogController = new DialogController();
+    
     this.registerWebsocketMessageTypes(this, Responses.NotifyLiveLogItem);
   }
 
@@ -253,7 +268,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
         <footer><div ${ref(this.scroller)}><div ${ref(this.scroller_anchor)}></div></div></footer>
         <div ${ref(this.modal)} class="modal"><span class="loader"></span></div>
         <div id="snackbar">Some text some message..</div>
-        ${this.dialogController.Template()}`
+        <div ${ref(this.dialog)}></div>`
     render(Template, document.body);
     
     console.log(`Connecting to ${WS_URL}`)
@@ -269,7 +284,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     this.socket.onerror = (event: Event) => {
       var message = `Websocket error ${event}`
       console.error(message)
-      this.dialogController.showOKDialog(Severity.ERROR, message)
+      this.showOKDialog(Severity.ERROR, message)
     }
     this.socket.onmessage = (event: MessageEvent<any>) => {
       this.onWebsocketData(event.data)
@@ -281,9 +296,10 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
       }
       var message = `Websocket has been closed ${event}`
       console.error(message)
-      this.dialogController.showOKDialog(Severity.ERROR, message)
+      this.showOKDialog(Severity.ERROR, message)
     }
     this.menu.check();
+    this.showWeeklyTimetableDialog(null)
   }
 
 }

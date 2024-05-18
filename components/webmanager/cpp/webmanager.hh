@@ -50,101 +50,11 @@
 
 #define TAG "WMAN"
 #define WLOG(mc, md) webmanager::M::GetSingleton()->Log(mc, md)
-
-namespace messagecodes
-{
-#define DEF(thecode, thestring) thecode,
-#define DEF_(thecode) thecode,
-    enum class C:uint32_t
-    {
-#include "default_messages.inc"
-#if __has_include(<messages.inc>)
-#include <messages.inc>
-#endif
-    };
-#undef DEF
-#undef DEF_
-#define DEF(thecode, thestring) thestring,
-#define DEF_(thecode) #thecode,
-    constexpr const char *N[] = {
-#include "default_messages.inc"
-#if __has_include(<messages.inc>)
-#include <messages.inc>
-#endif
-
-    };
-#undef DEF
-#undef DEF_
-}
-
+#include "webmanager_constants.hh"
+#include "webmanager_messagecodes.hh"
+#include "webmanager_utils.hh"
 namespace webmanager
 {
-    extern const char webmanager_html_br_start[] asm("_binary_index_compressed_br_start");
-    extern const size_t webmanager_html_br_length asm("index_compressed_br_length");
-
-    constexpr size_t MAX_AP_NUM = 8;
-    constexpr size_t STORAGE_LENGTH{16};
-    constexpr int ATTEMPTS_TO_RECONNECT{3};
-    constexpr time_t WIFI_MANAGER_RETRY_TIMER = 5000;
-    constexpr time_t WIFI_MANAGER_SHUTDOWN_AP_TIMER = 60000;
-    constexpr wifi_auth_mode_t AP_AUTHMODE{wifi_auth_mode_t::WIFI_AUTH_WPA2_PSK};
-    constexpr char nvs_namespace[]{"webmananger"};
-    constexpr char nvs_key_wifi_ssid[]{"ssid"};
-    constexpr char nvs_key_wifi_password[]{"password"};
-    
-
-    enum class WifiStationState
-    {
-        NO_CONNECTION,
-        SHOULD_CONNECT,   // Daten sind verfügbar, die passen könnten. Es soll beim nächsten Retry-Tick ein Verbindungsversuch gestartet werden. Gerade im Moment wurde aber noch kein Verbindungsversiuch gestartet. -->Scan möglich
-        ABOUT_TO_CONNECT, // es wurde gerade ein Verbindungsaufbau gestartet, es ist aber noch nicht klar, ob der erfolgreich war -->Scan nicht möglich
-        CONNECTED,
-    };
-
-    struct MessageLogEntry
-    {
-        uint32_t messageCode;
-        uint32_t lastMessageData;
-        uint32_t messageCount;
-        time_t lastMessageTimestamp;
-
-        MessageLogEntry(uint32_t messageCode, uint32_t lastMessageData, uint32_t messageCount, time_t lastMessageTimestamp) : messageCode(messageCode),
-                                                                                                                              lastMessageData(lastMessageData),
-                                                                                                                              messageCount(messageCount),
-                                                                                                                              lastMessageTimestamp(lastMessageTimestamp)
-        {
-        }
-        MessageLogEntry() : messageCode(0),
-                            lastMessageData(0),
-                            messageCount(0),
-                            lastMessageTimestamp(0)
-        {
-        }
-
-        bool operator<(const MessageLogEntry &str) const
-        {
-            return (lastMessageTimestamp < str.lastMessageTimestamp);
-        }
-    };
-
-    class AsyncResponse{
-        public:
-        uint8_t* buffer;
-        size_t buffer_len;
-       
-        AsyncResponse(flatbuffers::FlatBufferBuilder* b){
-            uint8_t* bp=b->GetBufferPointer();
-            buffer_len = b->GetSize();
-            buffer = new uint8_t[buffer_len];
-            std::memcpy(buffer, bp, buffer_len);
-        }
-
-        ~AsyncResponse(){
-            delete[] buffer;
-        }
-    };
-    
-    class M;
     class M : public MessageSender
     {
     private:
@@ -158,7 +68,6 @@ namespace webmanager
 
         wifi_config_t wifi_config_sta = {}; // 132byte
         wifi_config_t wifi_config_ap = {};  // 132byte
-        wifi_scan_config_t scan_config;     // 28byte
 
         wifi_ap_record_t accessp_records[MAX_AP_NUM]; // 80byte*8=640byte
         uint16_t accessp_records_len{0};
@@ -190,8 +99,9 @@ namespace webmanager
 
         void connectAsSTA()
         {
+            ESP_LOGI(TAG, "Trying to connect as station. ssid='%s', password='%s'.", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password);
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
             ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config_sta));
-            ESP_LOGI(TAG, "Calling esp_wifi_connect() for WIFI_IF_STA with ssid %s and password %s.", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password);
             ESP_ERROR_CHECK(esp_wifi_connect());
             staState = WifiStationState::ABOUT_TO_CONNECT;
         }
@@ -201,7 +111,7 @@ namespace webmanager
             nvs_handle handle;
             esp_err_t ret = ESP_OK;
             
-            GOTO_ERROR_ON_ERROR(nvs_open(nvs_namespace, NVS_READWRITE, &handle), "Unable to open nvs partition");
+            GOTO_ERROR_ON_ERROR(nvs_open_from_partition(NVS_PARTITION, NVS_NAMESPACE, NVS_READWRITE, &handle), "Unable to open nvs partition");
             GOTO_ERROR_ON_ERROR(nvs_erase_all(handle), "Unable to to erase all keys");
             ret = nvs_commit(handle);
             ESP_LOGI(TAG, "Successfully erased Wifi Sta configuration in flash");
@@ -220,7 +130,7 @@ namespace webmanager
             size_t sz{0};
 
             ESP_LOGI(TAG, "About to save config to flash!!");
-            GOTO_ERROR_ON_ERROR(nvs_open(nvs_namespace, NVS_READWRITE, &handle), "Unable to open nvs partition");
+            GOTO_ERROR_ON_ERROR(nvs_open_from_partition(NVS_PARTITION, NVS_NAMESPACE, NVS_READWRITE, &handle), "Unable to open nvs partition");
             sz = sizeof(tmp_ssid);
             ret = nvs_get_str(handle, nvs_key_wifi_ssid, tmp_ssid, &sz);
             if ((ret == ESP_OK || ret == ESP_ERR_NVS_NOT_FOUND) && strcmp((char *)tmp_ssid, (char *)wifi_config_sta.sta.ssid) != 0)
@@ -258,7 +168,7 @@ namespace webmanager
             nvs_handle handle;
             esp_err_t ret = ESP_OK;
             size_t sz;
-            GOTO_ERROR_ON_ERROR(nvs_open(nvs_namespace, NVS_READWRITE, &handle), "Unable to open nvs partition");
+            GOTO_ERROR_ON_ERROR(nvs_open_from_partition(NVS_PARTITION, NVS_NAMESPACE, NVS_READWRITE, &handle), "Unable to open nvs partition");
             sz = sizeof(wifi_config_sta.sta.ssid);
             ret = nvs_get_str(handle, nvs_key_wifi_ssid, (char *)wifi_config_sta.sta.ssid, &sz);
             if (ret != ESP_OK)
@@ -311,6 +221,9 @@ namespace webmanager
             if (staState == WifiStationState::CONNECTED)
             {
                 esp_wifi_set_mode(WIFI_MODE_STA);
+            }
+            else{
+                ESP_LOGE(TAG, "AP should be shut down, but staState != WifiStationState::CONNECTED");
             }
             xSemaphoreGive(webmanager_semaphore);
         }
@@ -369,13 +282,15 @@ namespace webmanager
                     break;
                 case WifiStationState::ABOUT_TO_CONNECT:
                     remainingAttempsToConnectAsSTA--;
-                    // Die Verbindung war bereits getrennt und es wurd über den Retry Timer versucht, diese neu aufzubauen. Das schlug fehl
+                    // Die Verbindung war bereits getrennt und es wurde über den Retry Timer versucht, diese neu aufzubauen. Das schlug fehl
                     if (remainingAttempsToConnectAsSTA <= 0)
                     {
-                        ESP_LOGW(TAG, "After (several?) attemps it was not possible to establish connection as STA with ssid %s and password %s (Reason %d). Start AccessPoint mode with ssid %s and password %s.", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password, wifi_event_sta_disconnected->reason, wifi_config_ap.ap.ssid, wifi_config_ap.ap.password);
+                        ESP_LOGD(TAG, "After (several?) attemps it was not possible to establish connection as STA with ssid %s and password %s (Reason %d). Start AccessPoint mode with ssid %s and password %s.", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password, wifi_event_sta_disconnected->reason, wifi_config_ap.ap.ssid, wifi_config_ap.ap.password);
+                        ESP_LOGI(TAG, "Re-establishing connection failed finally (Reason %d). Start AccessPoint mode with ssid %s and password %s..", wifi_event_sta_disconnected->reason, wifi_config_ap.ap.ssid, wifi_config_ap.ap.password);
+                        
                         staState = WifiStationState::NO_CONNECTION;
                         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-                        esp_wifi_scan_start(&scan_config, false);
+                        esp_wifi_scan_start(nullptr/*for default config*/, false);
                         scanIsActive=true;
                         flatbuffers::FlatBufferBuilder b(256);
                         auto res = CreateResponseWifiConnectFailedDirect(b, (char*)wifi_config_sta.sta.ssid);
@@ -383,7 +298,8 @@ namespace webmanager
                     }
                     else
                     {
-                        ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED, when STA_STATE::ABOUT_TO_CONNECT --> disconnection occured earlier and we tried to establish it again...which was not successful (Reason %d). Still %d attempt(s) to go.", wifi_event_sta_disconnected->reason, remainingAttempsToConnectAsSTA);
+                        ESP_LOGD(TAG, "WIFI_EVENT_STA_DISCONNECTED, when STA_STATE::ABOUT_TO_CONNECT --> disconnection occured earlier and we tried to establish it again...which was not successful (Reason %d). Still %d attempt(s) to go.", wifi_event_sta_disconnected->reason, remainingAttempsToConnectAsSTA);
+                        ESP_LOGI(TAG, "Re-establishing connection failed (Reason %d). Still %d attempt(s) to go.", wifi_event_sta_disconnected->reason, remainingAttempsToConnectAsSTA);
                         staState = WifiStationState::SHOULD_CONNECT;
                         xTimerStart(wifi_manager_retry_timer, portMAX_DELAY);
                     }
@@ -397,7 +313,7 @@ namespace webmanager
             }
             case WIFI_EVENT_AP_START:
             {
-                ESP_LOGI(TAG, "Successfully started Access Point with ssid %s and password '%s'. Webmanager is here: https://%s/webmanager", wifi_config_ap.ap.ssid, wifi_config_ap.ap.password, hostname);
+                ESP_LOGI(TAG, "Successfully started Access Point with ssid %s and password '%s'. Webmanager is here: https://%s", wifi_config_ap.ap.ssid, wifi_config_ap.ap.password, hostname);
                 break;
             }
             case WIFI_EVENT_AP_STOP:
@@ -647,7 +563,7 @@ namespace webmanager
             ESP_LOGI(TAG, "Prepare to send ResponseWifiAccesspoints");
             esp_err_t forcedScanResult{ESP_OK};
             if(!initialScanIsActive && !scanIsActive && forceUpdate){
-                forcedScanResult=esp_wifi_scan_start(&scan_config, true);
+                forcedScanResult=esp_wifi_scan_start(nullptr/*for default config*/, true);
                 this->scanIsActive=true;
                 ESP_LOGI(TAG, "Forced scan finished with %s", esp_err_to_name(forcedScanResult));
             }
@@ -870,12 +786,12 @@ namespace webmanager
         
         void RegisterHTTPDHandlers(httpd_handle_t httpd_handle)
         {
-            httpd_uri_t webmanager_get = {"/webmanager", HTTP_GET, handle_webmanager_get_static, this, false, false, nullptr};
             httpd_uri_t ota_post = {"/ota", HTTP_POST, handle_ota_post_static, this, false, false, nullptr};
-            httpd_uri_t webmanager_ws = {"/webmanager_ws", HTTP_GET, handle_webmanager_ws_static, this, true, false, nullptr};
-            ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_handle, &webmanager_get));
             ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_handle, &ota_post));
+            httpd_uri_t webmanager_ws = {"/webmanager_ws", HTTP_GET, handle_webmanager_ws_static, this, true, false, nullptr};
             ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_handle, &webmanager_ws));
+            httpd_uri_t webmanager_get = {"/*", HTTP_GET, handle_webmanager_get_static, this, false, false, nullptr};
+            ESP_ERROR_CHECK(httpd_register_uri_handler(httpd_handle, &webmanager_get));
             this->http_server=httpd_handle;
         }
 
@@ -973,12 +889,6 @@ namespace webmanager
             wifi_config_ap.ap.channel = 0;
             wifi_config_ap.ap.max_connection = 1;
             wifi_config_ap.ap.authmode = AP_AUTHMODE;
-
-            scan_config.ssid = 0;
-            scan_config.bssid = 0;
-            scan_config.channel = 0;
-            scan_config.show_hidden = false;
-
             
             asprintf(&hostname, hostnamePattern, mac[3], mac[4], mac[5]);
             ESP_ERROR_CHECK(esp_netif_set_hostname(wifi_netif_sta, hostname));
@@ -989,21 +899,6 @@ namespace webmanager
             ESP_LOGI(TAG, "mdns hostname set to '%s'", hostname);
             const char* MDNS_INSTANCE="SENSACT_MDNS_INSTANCE";
             ESP_ERROR_CHECK(mdns_instance_name_set(MDNS_INSTANCE));
-
-            /* DHCP AP configuration 
-    	    //This seems to be part of the default AccessPoint configuration, at least there is no such code in https://github.com/espressif/esp-idf/blob/release/v5.2/examples/wifi/getting_started/softAP/main/softap_example_main.c
-            esp_netif_ip_info_t ap_ip_info = {};
-            IP4_ADDR(&ap_ip_info.ip, 192, 168, 210, 0);
-            IP4_ADDR(&ap_ip_info.netmask, 255, 255, 255, 0);
-            IP4_ADDR(&ap_ip_info.gw, 192, 168, 210, 0);
-            ESP_ERROR_CHECK(esp_netif_dhcps_stop(wifi_netif_ap));
-            ESP_ERROR_CHECK(esp_netif_set_ip_info(wifi_netif_ap, &ap_ip_info));
-            ESP_ERROR_CHECK(esp_netif_dhcps_start(wifi_netif_ap));
-            */
-
-            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-            ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config_ap));
-            ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
             //turn wifi logging nearly off
             esp_log_level_set("wifi", ESP_LOG_WARN);
@@ -1017,32 +912,40 @@ namespace webmanager
             setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
             tzset();
 
+
+            ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
             if (resetStoredWifiConnection)
             {
                 ESP_LOGI(TAG, "Forced to delete saved wifi configuration. Starting access point and do an initial scan.");
                 delete_sta_config();
+                ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+                ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config_ap));
                 ESP_ERROR_CHECK(esp_wifi_start());
-                esp_wifi_scan_start(&scan_config, false);
+                esp_wifi_scan_start(nullptr/*for default config*/, false);
                 scanIsActive=true;
                 initialScanIsActive=true;
             }
             else if (read_sta_config() != ESP_OK)
             {
                 ESP_LOGI(TAG, "No saved wifi configuration found on startup. Starting access point and do an initial scan.");
+                
+                ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+                ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config_ap));
                 ESP_ERROR_CHECK(esp_wifi_start());
-                esp_wifi_scan_start(&scan_config, false);
+                esp_wifi_scan_start(nullptr/*for default config*/, false);
                 scanIsActive=true;
                 initialScanIsActive=true;
             }
             else
             {
                 ESP_LOGI(TAG, "Saved wifi found on startup. Will attempt to connect to ssid %s with password %s.", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password);
-                ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-                ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config_sta));
-                ESP_ERROR_CHECK(esp_wifi_start());
                 scanIsActive=false;
                 initialScanIsActive=false;
                 remainingAttempsToConnectAsSTA = ATTEMPTS_TO_RECONNECT;
+                ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+                ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config_sta));
+                ESP_ERROR_CHECK(esp_wifi_start());
                 ESP_ERROR_CHECK(esp_wifi_connect());
                 staState = WifiStationState::ABOUT_TO_CONNECT;
             }

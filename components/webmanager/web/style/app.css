@@ -8,6 +8,11 @@
   --main-white-color: #f2f2f2;
   --main-black-color: black;
   --main-purple-color: #9e89b8;
+  --blue-3: hsl(211, 57%, 25%);
+  --blue-4: hsl(211, 39%, 44%);
+  --blue-5: hsl(211, 51%, 65%);
+  --blue-7: hsl(211, 90%, 93%);
+  --blue-rich: hsl(211, 65%, 48%);
 }
 
 * {
@@ -74,6 +79,7 @@
     margin: 0;
   }
 
+  
 
   body>nav {
     grid-column: 1/span 1;
@@ -231,6 +237,18 @@ tr:nth-child(even) {
   background-color: #ffffff;
 }
 
+table.weekschedule {
+  border-collapse: collapse;
+  width:min-content;
+  tr{height: 0px; background-color: #ffffff;}
+  tr:nth-child(4n+1){
+    background-color: #dddddd;
+  }
+  th, td { border: 1px solid black;}
+  td:nth-child(n+1){padding: 4px; cursor:copy; }
+  .selected { background-color: lightblue; }
+}
+
 #wifi-list tr:hover {
   background-color: #ccffff;
   cursor: pointer;
@@ -303,3 +321,4 @@ p {
   margin-top: 10px;
   margin-bottom: 10px;
 }
+

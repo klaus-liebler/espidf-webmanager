@@ -56,16 +56,21 @@
      * Partition Table = Custom Partition Table
      * Flash Size >=8MB
      * Detect Flash Size when flashing bootloader
+     * CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3584
 
 ### When you intend to flash to a new ESP32 microcontroller (with a specific mac adress)
 1. In `components\webmanager\builder` call `gulp gethostname` (writes file certificates/esp32_hostname.txt with the hostname of esp32, that is derived from mac adress, template see "gulpfile_config.ts". This is done by reading the MAC address of the microcontroller attached via COM port)
 2. In `components\webmanager\builder` call `gulp certificates` (creates HTTPS certificates for the ESP32 microcontroller and for the testserver on the loacl pc")
-### When you want to define the settings (Name, Type, default Value), that can be setup in webui
+### When you want to define the available usersettings (Name, Type, default Value), that can be setup in webui
 1. Edit `usersettings/usersettings.ts`
 ### When you want to build the project
 1. In `components\webmanager\builder` call and call `gulp`
 2. In `components\webmanager\web` and call `npm run dev`
 3. Build esp-idf project
+
+### When you want to flash the initial nvs partion values (usersettings) to the nvs partition
+1. Precondition: Project including the custom partition table should have been flashed to the ESP32
+1. In `components\webmanager\builder` call `gulp flashusersettings`. This (re)sets the nvs partition to contain an initial value for all usersettings (problem: it resets ALL value. Hence, when you already did some changes for example on the wifi password, these changes get lost)
 
 ## Deprecated
 execute "gulp" in ESP_IDF console (that points to the right python environment)

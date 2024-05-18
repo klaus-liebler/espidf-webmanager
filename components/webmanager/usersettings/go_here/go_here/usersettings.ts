@@ -19,8 +19,8 @@ export default class{
                 new EnumItem("G2I4 Enum", ["Hund", "Katze", "Maus", "Ente"], "G2_4_E"),
             ]),
             new ConfigGroup("webmananger",[
-                new StringItem("ssid", "smopla", /.*/, "G3_1_S"),
-                new StringItem("password", "myosotis2020", /.*/, "G3_2_S"),
+                new StringItem("ssid", "Woeste123", /.*/),
+                new StringItem("password", "wrong", /.*/),
             ])
         ];
     }

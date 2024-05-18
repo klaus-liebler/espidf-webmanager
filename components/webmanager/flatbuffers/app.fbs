@@ -37,7 +37,8 @@ union Responses{
     ResponseGetUserSettings, 
     ResponseSetUserSettings,
     ResponseTimeseriesDummy,
-//fingerprint start 
+//fingerprint start
+    ResponseOpenDoor,
     ResponseEnrollNewFinger,
     NotifyEnrollNewFinger,
     NotifyFingerDetected,

@@ -1,8 +1,8 @@
 namespace webmanager;
 
-table RequestOpenDoor{
-    
-}
+table RequestOpenDoor{}
+
+table ResponseOpenDoor{}
 
 table RequestEnrollNewFinger{
     name:string;

@@ -1,146 +1,102 @@
-import { html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { IDialogBodyRenderer } from "../utils/interfaces";
-import { Html, Severity, severity2class, severity2symbol } from "../utils/common";
+import { Severity, severity2class, severity2symbol } from "../utils/common";
 
-enum Mode {
-    CUSTOM_RENDERER,
-    OK,
-    OK_CANCEL,
-    FILENAME,
-    PASSWORD,
-  }
 
-export class DialogController {
-    private dialog: Ref<HTMLDialogElement> = createRef();
-    private dialogHeading:Ref<HTMLElement> = createRef();
-    private dialogBodyLeft:Ref<HTMLElement> = createRef();
-    private dialogBodyRightMessage:Ref<HTMLParagraphElement> = createRef();
-    private dialogBodyRightContent:Ref<HTMLParagraphElement> = createRef();
-    private dialogFooter:Ref<HTMLElement> = createRef();
+
+export abstract class DialogController {
    
+    public abstract Template():TemplateResult<1>;
+    protected dialog: Ref<HTMLDialogElement> = createRef();
+    public Show():void{ this.dialog.value!.showModal();}
+}
+    
+export abstract class SimpleDialogController extends DialogController{
+    protected abstract footerTemplate():TemplateResult<1>;
+    protected abstract mainTemplate():TemplateResult<1>;
+
+
+    constructor(protected headingStr:string, protected severity:Severity, protected handler: ((ok: boolean, value: string) => any)|undefined){
+        super()
+    }
    
-    public Template = () => html`
-    <dialog ${ref(this.dialog)}>
+    protected cancelHandler() {
+    this.dialog.value!.close('Cancel')
+    this.handler?.(false, '')
+    }
+    
+      protected backdropClickedHandler(e:MouseEvent){
+        if (e.target === this.dialog) {
+            this.cancelHandler();
+        }
+      }
+   
+    public Template(){ return html`
+    <dialog class="simple" @cancel=${()=>this.cancelHandler()} @click=${(e:MouseEvent)=>this.backdropClickedHandler(e)} ${ref(this.dialog)}>
         <header>
-            <span ${ref(this.dialogHeading)}>Überschrift</span>
+            <span>${this.headingStr}</span>
             <button @click=${()=>this.dialog.value!.close("cancelled")} type="button">&times;</button>
         </header>
         <main>
-            <section ${ref(this.dialogBodyLeft)}></section>
-            <section><p ${ref(this.dialogBodyRightMessage)}></p><p ${ref(this.dialogBodyRightContent)}></p></section>
+            <section><span class=${severity2class(this.severity)}>${severity2symbol(this.severity)}</span></section>
+            <section>${this.mainTemplate()}</section>
         </main>
-        <footer ${ref(this.dialogFooter)}></footer>
-    </dialog>`
+        <footer>${this.footerTemplate()}</footer>
+    </dialog>`}
+}
 
-    private handler: ((ok: boolean, value: string) => any)|undefined;
-    private inputElement: HTMLInputElement | null=null;
-    private mode = Mode.OK
-
-    private ok_handler() {
-        this.dialog.value!.close('OK')
-        switch (this.mode) {
-            case Mode.FILENAME:
-            case Mode.PASSWORD:
-                this.handler?.(true, this.inputElement.value)
-                break;
-            case Mode.CUSTOM_RENDERER:
-                this.handler?.(true, this.inputElement?.value ?? '')
-                break;
-            default:
-                this.handler?.(true, '')
-                break;
-        }
-        
+export abstract class EnterSomethingDialog extends SimpleDialogController{
+    constructor(headingStr: string, protected messageText: string, handler?: ((ok: boolean, value: string) => any)){
+        super(headingStr, Severity.INFO, handler)
     }
-
-  private cancel_handler() {
-    this.dialog.value!.close('Cancel')
-    this.handler?.(false, '')
-  }
-
-    public init() {
-
-        this.dialog.value!.oncancel = () => {
-            this.dialog.value!.close("cancelled");
-        }
-
-        // close when clicking on backdrop
-        this.dialog.value!.onclick = (event) => {
-            if (event.target === this.dialog) {
-                this.dialog.value!.close('cancelled');
-            }
+    protected inputElement: Ref<HTMLInputElement>=createRef();
+    protected inpTextKeyup(e:KeyboardEvent) {
+        if (e.key == 'Enter') {
+            this.btnOkClick()
         }
     }
 
-
-    private prepareDialog(mode:Mode, h:string, m:string, severity:Severity, handler?:((ok: boolean, value: string) => any)) {
-        this.mode=mode;
-        this.dialogHeading.value!.innerText = h;
-        this.dialogBodyLeft.value!.innerText="";
-        Html(this.dialogBodyLeft.value!, "span", [], [severity2class(severity)], severity2symbol(severity));
-        this.dialogBodyRightMessage.value!.innerText = m;
-        this.dialogBodyRightContent.value!.innerText = "";
-        this.dialogFooter.value!.innerText="";
-        this.handler=handler;
+    protected btnOkClick() {
+        this.handler?.(true, this.inputElement.value!.value)
     }
 
-    
-    public showDialog(heading: string, message: string, renderer: IDialogBodyRenderer, handler?:((ok: boolean, value: string) => any)) {
-        this.prepareDialog(Mode.CUSTOM_RENDERER, heading, message, Severity.INFO, handler);
-        this.inputElement = renderer.Render(this.dialogBodyRightContent.value!);
-        Html(this.dialogFooter.value!, "button", [], [], "OK").onclick = () => {this.ok_handler()}
-        Html(this.dialogFooter.value!, "button", [], [], "Cancel").onclick = () => {this.cancel_handler()}
-        this.dialog.value!.showModal();
-        return this.dialog.value!;
+    protected footerTemplate(){return html`<input @click=${()=>this.btnOkClick()} type="button" value="OK"></input><input @click=${()=>this.cancelHandler()} type="button" value="Cancel"></input>`}
+}
+
+export class FilenameDialog extends EnterSomethingDialog{
+  
+    constructor(messageText: string, handler?: ((ok: boolean, value: string) => any)){
+        super("Enter Filename", messageText, handler)
+    }
+   
+    protected mainTemplate(){return html`<p> ${this.messageText}</p><p><input ${ref(this.inputElement)} @keyup=${(e:KeyboardEvent)=>this.inpTextKeyup(e)} type="text" pattern="^[A-Za-z0-9]{1,10}$"></input></p>`}
+}
+
+export class PasswordDialog extends EnterSomethingDialog{
+
+    constructor(messageText: string, handler?: ((ok: boolean, value: string) => any)){
+        super("Enter Passwort", messageText, handler)
     }
 
-    public showEnterFilenameDialog(messageText: string, handler?: ((ok: boolean, value: string) => any)) {
-        this.prepareDialog(Mode.FILENAME, "Enter Filename", messageText, Severity.INFO, handler);
-        this.inputElement = <HTMLInputElement>Html(this.dialogBodyRightContent.value!, "input", ["pattern", "^[A-Za-z0-9]{1,10}$"], []);
+    protected mainTemplate(){return html`<p> ${this.messageText}</p><p><input @keyup=${(e:KeyboardEvent)=>this.inpTextKeyup(e)} type="password"></input></p>`}
+}
 
-        var btnOk=Html(this.dialogFooter.value!, "button", [], [], "OK")
-        btnOk.onclick = () => {this.ok_handler()}
-        Html(this.dialogFooter.value!, "button", [], [], "Cancel").onclick = () => {this.cancel_handler()}
-        this.dialog.value!.showModal();
-        this.inputElement.focus();
-        this.inputElement.onkeyup = (e) => {
-            if (e.key == 'Enter') {
-                btnOk.click();
-            }
-        }
-        return this.dialog.value!;
+export class OkDialog extends SimpleDialogController{
+    constructor(severity: Severity, private messageText: string, handler?: ((ok: boolean, value: string) => any)){
+        super(Severity[severity], severity, handler)
     }
 
-    public showEnterPasswordDialog(severity: Severity, messageText: string, handler?: ((ok: boolean, value: string) => any)) {
-        this.prepareDialog(Mode.PASSWORD, "Enter Password", messageText, severity, handler);
-        
-        var btnOk = Html(this.dialogFooter.value!, "button", [], [], "OK");
-        btnOk.onclick = () => {this.ok_handler()}
-        this.inputElement = <HTMLInputElement>Html(this.dialogBodyRightContent.value!, "input", ["type", "password"], []);
-        Html(this.dialogFooter.value!, "button", [], [], "Cancel").onclick = () => {this.cancel_handler()}
-        this.dialog.value!.showModal();
-        this.inputElement.focus();
-        this.inputElement.onkeyup = (e) => {
-            if (e.key == 'Enter') {
-                btnOk.click();
-            }
-        }
-        return this.dialog.value!;
+    protected btnOkClick=()=>this.handler?.(true, '')
+    protected mainTemplate(){return html`<p> ${this.messageText}</p>`}
+    protected footerTemplate(){return html`<input @click=${()=>this.btnOkClick()} type="button" value="OK"></input>`}
+}
+
+export class OkCancelDialog extends SimpleDialogController{
+    constructor(severity: Severity, private messageText: string, handler?: ((ok: boolean, value: string) => any)){
+        super(Severity[severity], severity, handler)
     }
 
-    public showOKDialog(severity: Severity, messageText: string, handler?: ((ok: boolean, value: string) => any)) {
-        this.prepareDialog(Mode.OK, Severity[severity], messageText, severity, handler);
-        Html(this.dialogFooter.value!, "button", [], [], "OK").onclick = () => {this.ok_handler()}
-        this.dialog.value!.showModal();
-        return this.dialog.value!;
-    }
-
-    public showOKCancelDialog(severity: Severity, messageText: string, handler?: ((ok: boolean, value: string) => any)) {
-        this.prepareDialog(Mode.OK_CANCEL, Severity[severity], messageText, severity, handler);
-        Html(this.dialogFooter.value!, "button", [], [], "OK").onclick = () => {this.ok_handler()}
-        Html(this.dialogFooter.value!, "button", [], [], "Cancel").onclick = () => {this.cancel_handler()}
-        this.dialog.value!.showModal();
-        return this.dialog.value!;
-    }
+    protected btnOkClick=()=>this.handler?.(true, '')
+    protected mainTemplate(){return html`<p> ${this.messageText}</p>`}
+    protected footerTemplate(){return html`<input @click=${()=>this.btnOkClick()} type="button" value="OK"></input><input @click=${()=>this.cancelHandler()} type="button" value="Cancel"></input>`}
 }

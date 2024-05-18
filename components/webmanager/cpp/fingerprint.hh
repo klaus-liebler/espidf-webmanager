@@ -611,11 +611,12 @@ namespace FINGERPRINT
             if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
             RET ret=EmptyLibrary();
             if(ret!=RET::OK){
-                ESP_LOGE(TAG, "Error %d while calling TryDeleteAll.", (int)ret);
+                ESP_LOGE(TAG, "Error %d (hradware) while calling TryDeleteAll.", (int)ret);
                 return ret;
             }
             RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
             RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            ESP_LOGI(TAG, "Successfully deleted all Fingerprints on the sensor hardware and in flash");
             return RET::OK;
         }
 
