@@ -85,8 +85,8 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     this.renderAndShowDialog(new OkCancelDialog(pSeverity, messageText, pHandler));
   }
 
-  showWeeklyTimetableDialog(pHandler?: (ok: boolean, value: Uint8Array) => any):void{
-    this.renderAndShowDialog(new WeeklyScheduleDialog(pHandler));
+  showWeeklyTimetableDialog(pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, referenceHandle:any):void{
+    this.renderAndShowDialog(new WeeklyScheduleDialog(pHandler, referenceHandle));
   }
 
   showDialog<T extends DialogController>(type: { new(m: IAppManagement, pHandler?: ((ok: boolean, value: string) => any)): T; } , pHandler?: ((ok: boolean, value: string) => any)): void{
@@ -299,7 +299,6 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
       this.showOKDialog(Severity.ERROR, message)
     }
     this.menu.check();
-    this.showWeeklyTimetableDialog(null)
   }
 
 }

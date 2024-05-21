@@ -1,9 +1,9 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import {NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
+import {Finger, NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestStoreFingerAction, RequestStoreFingerTimetable, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import { Html, Severity } from "../utils/common";
-import { html } from "lit-html";
+import { TemplateResult, html } from "lit-html";
 
 enum RET
 {
@@ -81,7 +81,9 @@ export class FingerprintScreenController extends ScreenController {
                 <tr>
                     <th>Name</th>
                     <th>Index</th>
-                    <th>Actions</th>
+                    <th>Timetable</th>
+                    <th>Action</th>
+                    <th>Manage Entry</th>
                 </tr>
 
             </thead>
@@ -120,11 +122,67 @@ export class FingerprintScreenController extends ScreenController {
         this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseDeleteFinger]);
     }
 
+    private sendRequestStoreFingerTimetable(fingerName:string, timetableIndex:number){
+        let b = new flatbuffers.Builder(1024);
+        b.finish(
+            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerTimetable, 
+                RequestStoreFingerTimetable.createRequestStoreFingerTimetable(b, b.createString(fingerName), timetableIndex)
+                )
+        );
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerTimetable]);
+    }
+
+    private sendRequestStoreFingerAction(fingerName:string, actionIndex:number){
+        let b = new flatbuffers.Builder(1024);
+        b.finish(
+            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerAction, 
+                RequestStoreFingerAction.createRequestStoreFingerAction(b, b.createString(fingerName), actionIndex)
+                )
+        );
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerTimetable]);
+    }
 
     private insertParameter(name: string, value: string | number) {
         var row = this.tblFingerprintSensorInfo.value!.insertRow();
         row.insertCell().textContent = name;
         row.insertCell().textContent = value.toString();
+    }
+
+
+    private insertFinger(f:Finger):void{
+        var row = this.tblFingers.value!.insertRow();
+        this.fingerIndex2tr.set(f.index(),row);
+        this.fingerIndex2name.set(f.index(), f.name()!)
+       
+        row.insertCell().textContent = f.name();
+        row.insertCell().textContent = String(f.index());
+        var cell= row.insertCell();
+        var timeSelect=(<HTMLSelectElement>Html(cell, "select"));
+        timeSelect.options.add(new Option("Always", "0", true));
+        timeSelect.options.add(new Option("Never"));
+        timeSelect.options.add(new Option("Daily 6-22"));
+        timeSelect.options.add(new Option("Working Days 7-18"));
+        timeSelect.options.add(new Option("Cleaning Service"));
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Save`])).onchange = () => {
+            this.sendRequestStoreFingerTimetable(f.name()!, timeSelect.selectedIndex);
+        };        
+
+
+        cell= row.insertCell();
+        var actionSelect=(<HTMLSelectElement>Html(cell, "select"));
+        actionSelect.options.add(new Option("Open Door Front", "0", true));
+        actionSelect.options.add(new Option("Open Door Side"));
+        actionSelect.options.add(new Option("Open Garage"));
+        actionSelect.options.add(new Option("Alarm Silent"));
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Save`])).onchange = () => {
+            this.sendRequestStoreFingerAction(f.name()!,actionSelect.selectedIndex);
+        }; 
+
+        
+        cell= row.insertCell();
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `🗑`])).onclick = () => {
+            this.sendRequestDeleteFinger(f!.name()!);
+        };
     }
 
     onMessage(messageWrapper: ResponseWrapper): void {
@@ -152,16 +210,7 @@ export class FingerprintScreenController extends ScreenController {
                 for (let i = 0; i < m.fingersLength(); i++) {
                     var f= m.fingers(i);
                     if(!f) continue;
-                    var row = this.tblFingers.value!.insertRow();
-                    this.fingerIndex2tr.set(f.index(),row);
-                    this.fingerIndex2name.set(f.index(), f.name()!)
-                    row.insertCell().textContent = f.name();
-                    row.insertCell().textContent = String(f.index());
-                    var cell= row.insertCell();
-                    let button = <HTMLInputElement>Html(cell, "input", ["type", "button", "value", `🗑`]);
-                    button.onclick = () => {
-                        this.sendRequestDeleteFinger(f!.name()!);
-                    };
+                    this.insertFinger(f)
                 }
                 break;
             }

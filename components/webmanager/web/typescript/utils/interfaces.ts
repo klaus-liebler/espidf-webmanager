@@ -21,6 +21,7 @@ export interface IAppManagement {
   showEnterPasswordDialog(messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
   showOKDialog(pSeverity: Severity, messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
   showOKCancelDialog(pSeverity: Severity, messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
+  showWeeklyTimetableDialog(pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, referenceHandle:any):void;
 };
 
 export interface IDialogController {

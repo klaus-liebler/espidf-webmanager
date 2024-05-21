@@ -7,7 +7,7 @@ const startHour=6;
 enum MarkingMode{TOGGLE,ON,OFF};
 export class WeeklyScheduleDialog extends DialogController {
     
-    constructor(private pHandler?: (ok: boolean, value: Uint8Array) => any){
+    constructor(private pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, private referenceHandle:any){
         super()
     }
 
@@ -15,7 +15,10 @@ export class WeeklyScheduleDialog extends DialogController {
     private markingMode:MarkingMode=MarkingMode.TOGGLE
     private tblBody:Ref<HTMLTableSectionElement>= createRef();
    
-
+    public Show(){
+        this.setAll(false);
+        this.dialog.value!.showModal();
+    }
     private tdMousedown(e: MouseEvent) {
         //console.log(`mousedown @ ${(<HTMLElement>e.target).innerText}`)
         this.isSelecting = true;
@@ -46,62 +49,65 @@ export class WeeklyScheduleDialog extends DialogController {
     }
 
     private copy(sourceDay:number, destinationDays:Array<number>){
-        var t=this.tblBody.value!;
-        for(var r_index=0;r_index<t.rows.length;r_index++){
-            var offset=0;
-            if(r_index%4!=0) offset=-1
-            const r=t.rows[r_index]
-            var sourceMarked=r.cells[sourceDay+offset].classList.contains("selected")
-            for(const d of destinationDays){
-                if(sourceMarked){
-                    r.cells[d+offset].classList.add("selected")
-                }else{
-                    r.cells[d+offset].classList.remove("selected")
-                }
-            }
-        }
-    }
-
-    save() {
-        var t=this.tblBody.value!;
         
-    }
-
-
-    setAll(selected:boolean) {
-        var t=this.tblBody.value!;
-        for(var r_index=0;r_index<t.rows.length;r_index++){
-            var offset=0;
-            if(r_index%4!=0) offset=-1
-            const r=t.rows[r_index]
-            for(const d of [1,2,3,4,5,6,7]){
-                if(selected){
-                    r.cells[d+offset].classList.add("selected")
-                }else{
-                    r.cells[d+offset].classList.remove("selected")
-                }
+        for(var fifteen_minutes_slot=0;fifteen_minutes_slot<4*24;fifteen_minutes_slot++){
+            var sourceMarked=this.isSelected(sourceDay, fifteen_minutes_slot);
+            for(const d of destinationDays){
+                this.setSelected(d, fifteen_minutes_slot, sourceMarked);
             }
         }
     }
+
+    private setAll(selected:boolean) {
+        
+        for(var d=0;d<weekdays.length;d++){
+            for(var fifteen_minutes_slot=0;fifteen_minutes_slot<4*24;fifteen_minutes_slot++){
+                this.setSelected(d, fifteen_minutes_slot, selected);
+            }
+        }
+    }
+
+    private isSelected(day_zero_based:number, fifteen_minutes_slot:number){
+        const r=this.tblBody.value!.rows[day_zero_based]
+        return r.cells[fifteen_minutes_slot+1].classList.contains("selected")
+    }
+
+    private setSelected(day_zero_based:number, fifteen_minutes_slot:number, value:boolean){
+        const r=this.tblBody.value!.rows[day_zero_based]
+        if(value){
+            r.cells[fifteen_minutes_slot+1].classList.add("selected");
+        }else{
+            r.cells[fifteen_minutes_slot+1].classList.remove("selected");
+        }
+    }
+
+    private save() {
+        var t=this.tblBody.value!;
+        var arr = new Uint8Array(96);
+        for(var fifteen_minutes_slot=0;fifteen_minutes_slot<96;fifteen_minutes_slot++){
+            var week=0;
+            for(const d of [6,5,4,3,2,1,0]){
+                var sourceMarked=this.isSelected(d, fifteen_minutes_slot);
+                week&=sourceMarked?1:0;
+                week<<=1
+            }
+            arr[fifteen_minutes_slot]=week;
+        }
+        this.pHandler?.(true, this.referenceHandle, arr);
+        this.dialog.value!.close();
+    }
+
+    
+    
 
     public Template = () => {
-        const weekdayTemplate = (h, m, timeStr) => html`${weekdays.map((name, num) =>
+        const weekdayTemplate = (day_name, day_index) => html`${[...Array(96)].map((name, num) =>
             html`<td @mousedown=${(e: MouseEvent) => this.tdMousedown(e)} @mouseenter=${(e: MouseEvent) => this.tdMouseenter(e)} @mouseup=${(e: MouseEvent) => this.tdMouseup(e)}></td>`
         )}`
         const rowTemplates = [];
-        [...Array(24)].map((_, hour) => {
-            hour += startHour;
-            hour %= 24;
-
-            [...Array(4)].map((_, m15) => {
-                var timeStr = String(hour).padStart(2, '0') + ":" + String(m15 * 15).padStart(2, '0');
-                if (m15 == 0) {//start of hour
-                    rowTemplates.push(html`<tr><td rowspan=4>${timeStr}</td>${weekdayTemplate(hour, m15 * 15, timeStr)}</tr>`)
-                } else {
-                    rowTemplates.push(html`<tr>${weekdayTemplate(hour, m15 * 15, timeStr)}</tr>`)
-                }
-
-            })
+        weekdays.map((day_name, day_index) =>  {
+            rowTemplates.push(html`<tr><td>${day_name}</td>${weekdayTemplate(day_name, day_index)}</tr>`)
+            
 
         })
 
@@ -122,9 +128,9 @@ export class WeeklyScheduleDialog extends DialogController {
                 </fieldset>
                 <fieldset>
                     <legend>Comfort Copy</legend>
-                    <input @click=${(e:MouseEvent) => this.copy(1, [2,3,4,5])} type="button" value="Mo➔Di-Fr" />
-                    <input @click=${(e:MouseEvent) => this.copy(1, [2,3,4,5,6,7])} type="button" value="Mo➔Di-So" />
-                    <input @click=${(e:MouseEvent) => this.copy(6, [7])} type="button" value="Sa➔So" />
+                    <input @click=${(e:MouseEvent) => this.copy(0, [1,2,3,4])} type="button" value="Mo➔Di-Fr" />
+                    <input @click=${(e:MouseEvent) => this.copy(0, [1,2,3,4,5,6])} type="button" value="Mo➔Di-So" />
+                    <input @click=${(e:MouseEvent) => this.copy(5, [6])} type="button" value="Sa➔So" />
                 </fieldset>
                 <fieldset>
                     <legend>Comfort Fill</legend>
@@ -135,8 +141,8 @@ export class WeeklyScheduleDialog extends DialogController {
             <table class="weekschedule">
                 <thead>
                 <tr>
-                    <th>Uhrzeit</th>
-                    ${[weekdays.map((v) => html`<th>${v}</th>`)]}
+                    <th></th>
+                    ${[...Array(24)].map((v,i) => html`<th colspan=4>${(i+startHour)%24}:00</th>`)}
                 </tr>
                 </thead>
                 <tbody ${ref(this.tblBody)}>

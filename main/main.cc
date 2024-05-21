@@ -27,6 +27,8 @@
 #define TAG "MAIN"
 #define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
 #define NVS_FINGER_NAMESPACE "finger"
+#define NVS_FINGER_ACTION_NAMESPACE "finger_act"
+#define NVS_FINGER_TIMETABLE_NAMESPACE "finger_time"
 
 FINGERPRINT::M *fpm{nullptr};
 CANMONITOR::M *canmonitor{nullptr};
@@ -67,7 +69,10 @@ class Webmanager2Fingerprint2Hardware : public MessageReceiver, public FINGERPRI
 {
 private:
     MessageSender *callback{nullptr};
-    nvs_handle_t nvsHandle;
+
+    nvs_handle_t nvsFingerHandle;
+    nvs_handle_t nvsFingerTimetableHandle;
+    nvs_handle_t nvsFingerActionHandle;
     time_t fingerDetected{-1000000};
     static void static_task(void *args) { static_cast<Webmanager2Fingerprint2Hardware *>(args)->task(); }
     void task()
@@ -87,7 +92,7 @@ private:
     }
 
 public:
-    Webmanager2Fingerprint2Hardware(nvs_handle_t nvsHandle) : nvsHandle(nvsHandle) {}
+    Webmanager2Fingerprint2Hardware(nvs_handle_t nvsFingerHandle, nvs_handle_t nvsFingerTimetableHandle, nvs_handle_t nvsFingerActionHandle) : nvsFingerHandle(nvsFingerHandle), nvsFingerTimetableHandle(nvsFingerTimetableHandle),nvsFingerActionHandle(nvsFingerActionHandle)  {}
 
     void begin()
     {
@@ -199,8 +204,12 @@ public:
                 nvs_entry_info_t info;
                 nvs_entry_info(it, &info); // Can omit error check if parameters are guaranteed to be non-NULL
                 uint16_t index;
-                ESP_ERROR_CHECK(nvs_get_u16(nvsHandle, info.key, &index));
-                fingers_vector.push_back(webmanager::CreateFingerDirect(b, info.key, index));
+                uint16_t timetableIndex=0;
+                uint16_t actionIndex=0;
+                ESP_ERROR_CHECK(nvs_get_u16(nvsFingerHandle, info.key, &index));
+                nvs_get_u16(nvsFingerTimetableHandle, info.key, &timetableIndex);
+                nvs_get_u16(nvsFingerActionHandle, info.key, &actionIndex);
+                fingers_vector.push_back(webmanager::CreateFingerDirect(b, info.key, index, timetableIndex, actionIndex));
                 res = nvs_entry_next(&it);
             }
             nvs_release_iterator(it);
@@ -245,18 +254,22 @@ extern "C" void app_main(void)
 
     // timeseries::M* tsman=timeseries::M::GetSingleton();
     // tsman->Init(&zahl1, &zahl1, &zahl2, &zahl3);
-    nvs_handle_t nvsHandle;
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsHandle));
-
+    nvs_handle_t nvsFingerHandle;
+    nvs_handle_t nvsFingerTimetableHandle;
+    nvs_handle_t nvsFingerActionHandle;
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsFingerHandle));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_TIMETABLE_NAMESPACE, NVS_READWRITE, &nvsFingerTimetableHandle));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_ACTION_NAMESPACE, NVS_READWRITE, &nvsFingerActionHandle));
+    
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
     led = new LED::M(PIN_LED, true);
     led->Begin();
 
-    Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsHandle);
+    Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
     w2f->begin();
 
-    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, nvsHandle);
+    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
     fpm->begin(PIN_FINGER_TX, PIN_FINGER_RX);
 
     canmonitor = new CANMONITOR::M(w2f);

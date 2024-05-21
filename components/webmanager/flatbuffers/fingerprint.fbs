@@ -32,6 +32,17 @@ table ResponseDeleteFinger{
     name:string;
 }
 
+table RequestStoreFingerAction{
+    name:string;
+    actionIndex:uint16;
+}
+table ResponseStoreFingerAction{}
+
+table RequestStoreFingerTimetable{
+    name:string;
+    timetableIndex:uint16;
+}
+table ResponseStoreFingerTimetable{}
 
 table RequestDeleteAllFingers{}
 table ResponseDeleteAllFingers{
@@ -69,6 +80,8 @@ table RequestFingers{}
 table Finger{
     name:string;
     index:uint16;
+    timetableIndex:uint16;
+    actionIndex:uint16;
 }
 
 table ResponseFingers{

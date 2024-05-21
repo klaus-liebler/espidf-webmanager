@@ -223,7 +223,9 @@ namespace FINGERPRINT
         SystemParameter params;
         bool previousIrqLineValue{true};
         iFingerprintHandler* handler;
-        nvs_handle_t nvsHandle;
+        nvs_handle_t nvsHandleFinger;
+        nvs_handle_t nvsHandleTimetable;
+        nvs_handle_t nvsHandleAction;
         SemaphoreHandle_t mutex;
         bool isInEnrollment{false};
         uint32_t targetAddress{0xFFFFFFFF};
@@ -269,9 +271,9 @@ namespace FINGERPRINT
                 return;
             }
             esp_err_t err{ESP_OK};
-            if(nvsHandle){
-                err = nvs_set_u16(this->nvsHandle, this->fingerName, fingerIndex);
-                nvs_commit(this->nvsHandle);
+            if(nvsHandleFinger){
+                err = nvs_set_u16(this->nvsHandleFinger, this->fingerName, fingerIndex);
+                nvs_commit(this->nvsHandleFinger);
             }
             if(err!=ESP_OK){
                 ESP_LOGE(TAG, "Finger with index %d could not be stored in nvs with key %s. Error code %d", fingerIndex, fingerName, err);
@@ -463,8 +465,6 @@ namespace FINGERPRINT
             return (RET)buffer[9];
         }
 
-
-
         RET AutoEnroll(uint16_t& fingerIndexOr0xFFFF_inout, bool overwriteExisting, bool duplicateFingerAllowed, bool returnStatusDuringProcess, bool fingerHasToLeaveBetweenScans){
             uint8_t data[7];
             data[0]=(uint8_t)INSTRUCTION::AutoEnroll;
@@ -510,7 +510,7 @@ namespace FINGERPRINT
         
 
     public:
-        M(uart_port_t uart_num, gpio_num_t gpio_irq, iFingerprintHandler* handler, nvs_handle_t nvsHandle, uint32_t targetAddress=DEFAULT_ADDRESS) : uart_num(uart_num), gpio_irq(gpio_irq), handler(handler), nvsHandle(nvsHandle), targetAddress(targetAddress) {}
+        M(uart_port_t uart_num, gpio_num_t gpio_irq, iFingerprintHandler* handler, nvs_handle_t nvsHandleFinger, nvs_handle_t nvsHandleTimetable, nvs_handle_t nvsHandleAction ,uint32_t targetAddress=DEFAULT_ADDRESS) : uart_num(uart_num), gpio_irq(gpio_irq), handler(handler), nvsHandleFinger(nvsHandleFinger), nvsHandleTimetable(nvsHandleTimetable), nvsHandleAction(nvsHandleAction), targetAddress(targetAddress) {}
         
         RET begin(gpio_num_t txd, gpio_num_t rxd)
         {
@@ -549,11 +549,11 @@ namespace FINGERPRINT
             return &this->params;
         }
 
-        RET  TryEnrollAndStore(const char* name){
+        RET TryEnrollAndStore(const char* name){
             ESP_LOGI(TAG, "TryEnrollAndStore name=%s", name);
             uint16_t fingerIndex{0};
-            if(nvsHandle){
-                if(nvs_get_u16(this->nvsHandle, name, &fingerIndex)!= ESP_ERR_NVS_NOT_FOUND){
+            if(nvsHandleFinger){
+                if(nvs_get_u16(this->nvsHandleFinger, name, &fingerIndex)!= ESP_ERR_NVS_NOT_FOUND){
                     ESP_LOGE(TAG, "Finger with name '%s' already exists", name);
                     return RET::xNVS_NAME_ALREADY_EXISTS;
                 }
@@ -573,7 +573,7 @@ namespace FINGERPRINT
             RET ret = AutoEnroll(fingerIndex, false, true, true, true);
             if(ret!=RET::OK){
                 ESP_LOGE(TAG, "Error %d while calling AutoEnroll.", (int)ret);
-                //Important: do not return here, because mutex will not be freed
+                //Important: do not return here, because mutex will not be given back
             }
             
             xSemaphoreGive(mutex);
@@ -581,41 +581,41 @@ namespace FINGERPRINT
         }
 
         RET TryRename(const char*  oldName, const char* newName){
-            if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
+            if(!nvsHandleFinger) return RET::xNVS_NOT_AVAILABLE;
             uint16_t fingerIndex{0};
-            if(nvs_get_u16(this->nvsHandle, newName, &fingerIndex)!= ESP_ERR_NVS_NOT_FOUND){
+            if(nvs_get_u16(this->nvsHandleFinger, newName, &fingerIndex)!= ESP_ERR_NVS_NOT_FOUND){
                 return RET::xNVS_NAME_ALREADY_EXISTS;
             }
-            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsHandle, oldName, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
-            RETURN_ERRORCODE_ON_ERROR(nvs_erase_key(this->nvsHandle, oldName), RET::xNVS_NOT_AVAILABLE);
-            RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsHandle, newName, fingerIndex), RET::xNVS_NOT_AVAILABLE);
-            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsHandleFinger, oldName, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_key(this->nvsHandleFinger, oldName), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsHandleFinger, newName, fingerIndex), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandleFinger), RET::xNVS_NOT_AVAILABLE);
             return RET::OK;
         }
 
         RET TryDelete(const char* name){
-            if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
+            if(!nvsHandleFinger) return RET::xNVS_NOT_AVAILABLE;
             uint16_t fingerIndex{0};
-            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsHandle, name, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
+            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsHandleFinger, name, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
             RET ret = DeleteChar(fingerIndex);
             if(ret!=RET::OK){
                 ESP_LOGE(TAG, "Error %d while calling TryDelete.", (int)ret);
                 return ret;
             }
-            RETURN_ERRORCODE_ON_ERROR(nvs_erase_key(this->nvsHandle, name), RET::xNVS_NOT_AVAILABLE);
-            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_key(this->nvsHandleFinger, name), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandleFinger), RET::xNVS_NOT_AVAILABLE);
             return RET::OK;
         }
 
         RET TryDeleteAll(){
-            if(!nvsHandle) return RET::xNVS_NOT_AVAILABLE;
+            if(!nvsHandleFinger) return RET::xNVS_NOT_AVAILABLE;
             RET ret=EmptyLibrary();
             if(ret!=RET::OK){
                 ESP_LOGE(TAG, "Error %d (hradware) while calling TryDeleteAll.", (int)ret);
                 return ret;
             }
-            RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
-            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandle), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsHandleFinger), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandleFinger), RET::xNVS_NOT_AVAILABLE);
             ESP_LOGI(TAG, "Successfully deleted all Fingerprints on the sensor hardware and in flash");
             return RET::OK;
         }
@@ -631,6 +631,20 @@ namespace FINGERPRINT
                 return ret;
             }
             return (RET)buffer[9];
+        }
+    
+        RET TryStoreFingerAction(const char* name, uint16_t actionIndex){
+            if(!nvsHandleFinger) return RET::xNVS_NOT_AVAILABLE;
+            RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsHandleAction, name, actionIndex), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandleAction), RET::xNVS_NOT_AVAILABLE);
+            return RET::OK;
+        }
+
+        RET TryStoreFingerTimetable(const char* name, uint16_t actionIndex){
+             if(!nvsHandleFinger) return RET::xNVS_NOT_AVAILABLE;
+            RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsHandleTimetable, name, actionIndex), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsHandleTimetable), RET::xNVS_NOT_AVAILABLE);
+            return RET::OK;
         }
     };
 

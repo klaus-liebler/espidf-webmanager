@@ -38,6 +38,8 @@ union Responses{
     ResponseSetUserSettings,
     ResponseTimeseriesDummy,
 //fingerprint start
+    ResponseStoreFingerAction,
+    ResponseStoreFingerTimetable,
     ResponseOpenDoor,
     ResponseEnrollNewFinger,
     NotifyEnrollNewFinger,
@@ -62,7 +64,9 @@ union Requests{
     RequestGetUserSettings, 
     RequestSetUserSettings, 
     RequestTimeseries,
-//fingerprint start 
+//fingerprint start
+    RequestStoreFingerAction,
+    RequestStoreFingerTimetable,
     RequestOpenDoor,
     RequestEnrollNewFinger,
     RequestDeleteFinger,
