@@ -57,6 +57,7 @@ enum RET
     xNVS_NAME_TOO_LONG=0x109,
     xCANNOT_GET_MUTEX=0x10A,
     xNVS_NOT_AVAILABLE=0x10B,
+    xNAME_IS_NULL=0x10C,
 };
 
 export class FingerprintScreenController extends ScreenController {
@@ -170,8 +171,8 @@ export class FingerprintScreenController extends ScreenController {
 
         cell= row.insertCell();
         var actionSelect=(<HTMLSelectElement>Html(cell, "select"));
-        actionSelect.options.add(new Option("Open Door Front", "0", true));
-        actionSelect.options.add(new Option("Open Door Side"));
+        actionSelect.options.add(new Option("Open Door Side", "0", true));
+        actionSelect.options.add(new Option("Open Door Front"));
         actionSelect.options.add(new Option("Open Garage"));
         actionSelect.options.add(new Option("Alarm Silent"));
         (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Save`])).onchange = () => {

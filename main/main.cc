@@ -65,7 +65,7 @@ constexpr twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_T
 LED::BlinkPattern SLOW(300, 1700);
 LED::BlinkPattern FAST(200, 200);
 
-class Webmanager2Fingerprint2Hardware : public MessageReceiver, public FINGERPRINT::iFingerprintHandler, public CANMONITOR::iCanmonitorHandler
+class Webmanager2Fingerprint2Hardware : public MessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
 {
 private:
     MessageSender *callback{nullptr};
@@ -123,7 +123,7 @@ public:
         }
         if (errorCode == (uint8_t)FINGERPRINT::RET::OK)
         {
-            this->fingerDetected = millis();
+            
             ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d", finger);
             //buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
         }
@@ -132,6 +132,21 @@ public:
             //buzzer->PlaySong(BUZZER::RINGTONE_SONG::NEGATIV);
         }
     }
+    
+    void HandleFingerprintAction(uint16_t fingerIndex, int action) override
+    {
+        ESP_LOGI(TAG, "Fingerprint action successfully triggered: fingerIndex=%d, actionIndex=%d", fingerIndex, action);
+        switch (action)
+        {
+        case 0:
+            this->fingerDetected = millis();
+            break;
+        
+        default:
+            break;
+        }        
+    }
+    
     void HandleEnrollmentUpdate(uint8_t errorCode, uint8_t step, uint16_t fingerIndex, const char *name) override
     {
         if (callback)
