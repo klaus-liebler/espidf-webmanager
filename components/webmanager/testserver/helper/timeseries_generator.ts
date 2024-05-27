@@ -1,4 +1,4 @@
-import { TimeGranularity } from "./generated/flatbuffers/webmanager";
+import { TimeGranularity } from "./../generated/flatbuffers/webmanager";
 
 function updateDate(date: Date, granularity: TimeGranularity) {
     switch (granularity) {

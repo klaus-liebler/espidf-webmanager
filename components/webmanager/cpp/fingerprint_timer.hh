@@ -23,7 +23,7 @@ namespace FINGERPRINT
             int m = localTime->tm_min;
             int s = localTime->tm_sec;
             auto val= this->IsActive(day_of_week, h, m, s);
-            ESP_LOGI(TAG, "On %d:%d:%d und weekday %d timer is %sactive", h,m,s,day_of_week, val?"in":"");
+            ESP_LOGI(TAG, "On %d:%d:%d und weekday %d timer is %sactive", h,m,s,day_of_week, val?"":"in");
             return val;
         }
 
@@ -77,6 +77,16 @@ namespace FINGERPRINT
 
     } constexpr CleaningService;
 
-    constexpr std::array<const iTimer *const, 5> TIMER{&ALWAYS, &NEVER, &Daily_6_22, &WorkingDays_7_18, &CleaningService};
+
+    class : public iTimer
+    {
+        bool IsActive(int d, int h, int m, int s) const override
+        {
+            return (m%2==0);
+        }
+
+    }constexpr TestEvenMinutesOnOddMinutesOff;
+
+    constexpr std::array<const iTimer *const, 6> TIMER{&ALWAYS, &NEVER, &Daily_6_22, &WorkingDays_7_18, &CleaningService, &TestEvenMinutesOnOddMinutesOff};
 }
 #undef TAG

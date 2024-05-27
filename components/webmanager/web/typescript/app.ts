@@ -5,7 +5,7 @@ import RouterMenu, { IRouteHandler, Route } from "./routermenu";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { IAppManagement, IDialogBodyRenderer, IWebsocketMessageListener } from "./utils/interfaces";
 import { ResponseWrapper, NotifyLiveLogItem, Responses } from "../generated/flatbuffers/webmanager";
-import { DialogController, FilenameDialog, OkCancelDialog, OkDialog, PasswordDialog } from "./screen_controller/dialog_controller";
+import { DialogController, FilenameDialog, OkCancelDialog, OkDialog, PasswordDialog } from "./dialog_controller/dialog_controller";
 import { Severity, Html, severity2class, severity2symbol } from "./utils/common";
 import { WS_URL } from "./constants";
 import * as flatbuffers from "flatbuffers"
@@ -18,6 +18,7 @@ import { FingerprintScreenController } from "./screen_controller/fingerprint_con
 import { SystemScreenController } from "./screen_controller/systemscreen_controller";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
 import { WeeklyScheduleDialog } from "./dialog_controller/weeklyschedule_dialog";
+import { SchedulerScreenController } from "./screen_controller/scheduler_controller";
 
 
 
@@ -41,6 +42,7 @@ function AddScreenControllers(app: AppController): void {
   app.AddScreenController("wifiman", new RegExp("^/wifiman$"), html`<span>📶</span><span>Wifi Manager</span>`, WifimanagerScreenController)
   //app.AddScreenController("timeseries", /^\/timeseries(?:\/(?<id>\w*))?(?:\/(?<val>\d*))?$/, html`<span>📶</span><span>Timeseries</span>`, TimeseriesController)
   app.AddScreenController("finger", new RegExp("^/finger$"), html`<span>👉</span><span>Fingerprint</span>`, FingerprintScreenController)
+  app.AddScreenController("schedule", new RegExp("^/schedule$"), html`<span>👉</span><span>Scheduler</span>`, SchedulerScreenController)
 }
 
 class BufferedMessage {
@@ -85,12 +87,12 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     this.renderAndShowDialog(new OkCancelDialog(pSeverity, messageText, pHandler));
   }
 
-  showWeeklyTimetableDialog(pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, referenceHandle:any):void{
-    this.renderAndShowDialog(new WeeklyScheduleDialog(pHandler, referenceHandle));
+  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, referenceHandle:any):void{
+    this.renderAndShowDialog(new WeeklyScheduleDialog(heading, initialValue, pHandler, referenceHandle));
   }
 
-  showDialog<T extends DialogController>(type: { new(m: IAppManagement, pHandler?: ((ok: boolean, value: string) => any)): T; } , pHandler?: ((ok: boolean, value: string) => any)): void{
-    this.renderAndShowDialog(new type(this, pHandler));
+  showDialog<T extends DialogController>(type: T): void{
+    this.renderAndShowDialog(type);
   }
 
   private renderAndShowDialog(d:DialogController){

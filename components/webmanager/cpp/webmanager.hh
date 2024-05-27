@@ -85,8 +85,7 @@ namespace webmanager
         int remainingAttempsToConnectAsSTA{0};
         bool initialScanIsActive{false};
         bool scanIsActive{false};
-        MessageReceiver** plugins{nullptr};
-        size_t pluginsLen{0};
+        std::vector<iMessageReceiver*> *plugins{nullptr};
 
         M(){}
 
@@ -499,9 +498,8 @@ namespace webmanager
                 break;
             default:{
                 bool success{false};
-                if(plugins && pluginsLen>0){
-                    for(int i=0;i<pluginsLen;i++){
-                        MessageReceiver* mr =plugins[i];
+                if(plugins){
+                    for(auto mr:*plugins){
                         if(mr->provideWebsocketMessage(this, req, &ws_pkt, mw)==ESP_OK){
                             success=true;
                         }
@@ -779,9 +777,8 @@ namespace webmanager
             myself->LogJournal(messagecodes::C::SNTP, esp_timer_get_time() / 1000);
         }
 
-        void SetPlugins(MessageReceiver** plugins, size_t pluginsLen){
+        void SetPlugins(std::vector<iMessageReceiver*> *plugins){
             this->plugins=plugins;
-            this->pluginsLen=pluginsLen;
         }
         
         void RegisterHTTPDHandlers(httpd_handle_t httpd_handle)

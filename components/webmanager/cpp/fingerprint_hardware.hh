@@ -202,7 +202,9 @@ namespace FINGERPRINT
 
     struct SystemParameter{
         uint16_t status;
-        uint16_t librarySize;
+        uint16_t librarySizeMax;
+        uint16_t librarySizeUsed;
+        std::array<uint8_t, 32U> libraryIndicesUsed;
         uint8_t securityLevel;
         uint32_t deviceAddress;
         uint8_t dataPacketSizeCode;
@@ -378,7 +380,7 @@ public:
                 return (RET)buffer[9];
             }
             outParams.status=ParseU16_BE(buffer, 10);
-            outParams.librarySize=ParseU16_BE(buffer, 14);
+            outParams.librarySizeMax=ParseU16_BE(buffer, 14);
             outParams.securityLevel=ParseU16_BE(buffer, 16);
             outParams.deviceAddress=ParseU32_BE(buffer, 18);
             outParams.dataPacketSizeCode=ParseU16_BE(buffer, 22);
@@ -430,10 +432,11 @@ public:
                 return (RET)buffer[9];
             }
             num=ParseU16_BE(buffer, 10);
+            ESP_LOGI(TAG, "Fingerprint reader has %d (0x%04X) valid templates", num, num);
             return RET::OK;
         }
 
-        RET GetTemplateIndexTable(uint8_t page_0_1_2_3, std::array<uint8_t, 32> buf){
+        RET GetTemplateIndexTable(uint8_t page_0_1_2_3, std::array<uint8_t, 32> &buf){
             uint8_t data[]{(uint8_t)INSTRUCTION::ReadIndexTable, (uint8_t)(page_0_1_2_3%4)};
             createAndSendDataPackage(PacketIdentifier::COMMANDPACKET, data, sizeof(data));
             const size_t wireLength{2+4+1+2+1+32+2};
@@ -458,6 +461,10 @@ public:
             ret= GetAlgVer(&outParams.algVer);
             if(ret!=RET::OK) return ret;
             ret= GetFwVer(&outParams.fwVer);
+            if(ret!=RET::OK) return ret;
+            ret= GetTemplateNumber(outParams.librarySizeUsed);
+            if(ret!=RET::OK)return ret;
+            ret = GetTemplateIndexTable(0, outParams.libraryIndicesUsed);
             return ret;
         }
 
@@ -553,7 +560,7 @@ public:
             fingerName[MAX_FINGERNAME_LEN+1]=0;
         }
         
-        RET begin(gpio_num_t txd, gpio_num_t rxd)
+        RET begin(gpio_num_t tx_host, gpio_num_t rx_host)
         {
 
             /* Install UART friver */
@@ -567,7 +574,7 @@ public:
 
             ESP_ERROR_CHECK(uart_driver_install(uart_num, 256, 0, 1, nullptr, 0));
             ESP_ERROR_CHECK(uart_param_config(uart_num, &c));
-            ESP_ERROR_CHECK(uart_set_pin(uart_num, (int)txd, (int)rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+            ESP_ERROR_CHECK(uart_set_pin(uart_num, (int)tx_host, (int)rx_host, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
             ESP_ERROR_CHECK(uart_flush(uart_num));
 
             gpio_pullup_en(gpio_irq);
@@ -578,7 +585,7 @@ public:
                 ESP_LOGE(TAG, "Communication error with fingerprint reader. Error code %d", (int)ret);
                 return RET::HARDWARE_ERROR;
             }
-            ESP_LOGI(TAG, "Successfully connected with fingerprint addr=%lu; securityLevel=%u; libSize=%u; fwVer=%s; algVer=%s; status=%u", params.deviceAddress,params.securityLevel, params.librarySize, params.fwVer, params.algVer, params.status);
+            ESP_LOGI(TAG, "Successfully connected with fingerprint addr=%lu; securityLevel=%u; libSize=%u; libUsed=%u fwVer=%s; algVer=%s; status=%u", params.deviceAddress,params.securityLevel, params.librarySizeMax, params.librarySizeUsed, params.fwVer, params.algVer, params.status);
             
             xTaskCreate(static_task, "fingerprint", 3072, this, 10, nullptr);
             return RET::OK;

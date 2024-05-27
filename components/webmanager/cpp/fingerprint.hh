@@ -88,10 +88,10 @@ namespace FINGERPRINT
                 handler->HandleEnrollmentUpdate(errorCode, step, fingerIndex, fingerName);
         }
 
-        RET begin(gpio_num_t txd, gpio_num_t rxd)
+        RET begin(gpio_num_t tx_host, gpio_num_t rx_host)
         {
             mutex = xSemaphoreCreateMutex();
-            return R503Pro::begin(txd, rxd);
+            return R503Pro::begin(tx_host, rx_host);
         }
 
         RET TryEnrollAndStore(const char *fingerName)
@@ -207,31 +207,23 @@ namespace FINGERPRINT
             return RET::OK;
         }
 
-        RET TryStoreFingerAction(const char *name, uint16_t actionIndex)
+        RET TryStoreFingerAction(uint16_t fingerIndex, uint16_t actionIndex)
         {
-            if (!nvsFingerName2FingerIndex)
-                return RET::xNVS_NOT_AVAILABLE;
-            uint16_t fingerIndex{0};
-            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsFingerName2FingerIndex, name, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
             char fingerIndexAsString[6];
             snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
             RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsFingerIndex2Action, fingerIndexAsString, actionIndex), RET::xNVS_NOT_AVAILABLE);
             RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Action), RET::xNVS_NOT_AVAILABLE);
-            ESP_LOGI(TAG, "Successfully stored finger action. index=%d name=%s action=%d", fingerIndex, name, actionIndex);
+            ESP_LOGI(TAG, "Successfully stored finger action. index=%d action=%d", fingerIndex, actionIndex);
             return RET::OK;
         }
 
-        RET TryStoreFingerTimetable(const char *name, uint16_t timetableIndex)
+        RET TryStoreFingerTimetable(uint16_t fingerIndex, uint16_t timetableIndex)
         {
-            if (!nvsFingerName2FingerIndex)
-                return RET::xNVS_NOT_AVAILABLE;
-            uint16_t fingerIndex{0};
-            RETURN_ERRORCODE_ON_ERROR(nvs_get_u16(this->nvsFingerName2FingerIndex, name, &fingerIndex), RET::xNVS_NAME_UNKNOWN);
             char fingerIndexAsString[6];
             snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
             RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsFingerIndex2Timetable, fingerIndexAsString, timetableIndex), RET::xNVS_NOT_AVAILABLE);
             RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Timetable), RET::xNVS_NOT_AVAILABLE);
-            ESP_LOGI(TAG, "Successfully stored finger timetable. index=%d name=%s timetable=%d", fingerIndex, name, timetableIndex);
+            ESP_LOGI(TAG, "Successfully stored finger timetable. index=%d timetable=%d", fingerIndex, timetableIndex);
             return RET::OK;
         }
     };

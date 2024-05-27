@@ -2,6 +2,7 @@ import { UserConfig, PluginOption } from "vite"
 import { OutputChunk, OutputAsset, OutputOptions, NormalizedOutputOptions, OutputBundle} from "rollup"
 import * as zlib from "node:zlib"
 import * as fs from "node:fs"
+import { minify } from "esbuild-minify-templates"
 
 export type Config = {
 	// Modifies the Vite build config to make this plugin work well. See `_useRecommendedBuildConfig`
@@ -23,13 +24,14 @@ export type Config = {
 	deleteInlinedFiles?: boolean
 }
 
-const defaultConfig = { useRecommendedBuildConfig: true, removeViteModuleLoader: false, deleteInlinedFiles: true }
+const defaultConfig = { useRecommendedBuildConfig: true, removeViteModuleLoader: true, deleteInlinedFiles: true }
+const commentRegex = /<!--.*?-->/gs;
 
 export function replaceScript(html: string, scriptFilename: string, scriptCode: string, removeViteModuleLoader = false): string {
 	const reScript = new RegExp(`<script([^>]*?) src="[./]*${scriptFilename}"([^>]*)></script>`)
 	// we can't use String.prototype.replaceAll since it isn't supported in Node.JS 14
 	const preloadMarker = /"__VITE_PRELOAD__"/g
-	const newCode = scriptCode.replace(preloadMarker, "void 0")
+	const newCode = minify(scriptCode.replace(preloadMarker, "void 0")).toString().replace(commentRegex, "");
 	const inlined = html.replace(reScript, (_, beforeSrc, afterSrc) => `<script${beforeSrc}${afterSrc}>${newCode}</script>`)
 	return removeViteModuleLoader ? _removeViteModuleLoader(inlined) : inlined
 }
@@ -94,7 +96,7 @@ export function viteSingleFile({
 					replacedHtml = replaceCss(replacedHtml, cssAsset.fileName, cssAsset.source as string);
 				});
 				htmlAsset.source = replacedHtml;
-				zlib.brotliCompress(replacedHtml, (error: Error | null, result: Buffer)=>{ fs.writeFile("./dist/index.compressed.br", result, ()=>{console.log(`Compressed file written FileSize=${result.byteLength}bytes=${result.byteLength/1024.0}kibiBytes`)})});
+				zlib.brotliCompress(replacedHtml, (error: Error | null, result: Buffer)=>{ fs.writeFile("./dist/index.compressed.br", result, ()=>{console.log(`Compressed file written. FileSize = ${result.byteLength} byte = ${(result.byteLength/1024.0).toFixed(2)} kiB`)})});
 			});
 			if (deleteInlinedFiles) {
 				for (const name of bundlesToDelete) {

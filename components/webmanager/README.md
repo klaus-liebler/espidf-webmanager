@@ -65,8 +65,8 @@
 1. Edit `usersettings/usersettings.ts`
 ### When you want to build the project
 1. In `components\webmanager\builder` call and call `gulp`
-2. In `components\webmanager\web` and call `npm run dev`
-3. Build esp-idf project
+2. In `components\webmanager\web` and call `npm run build`
+3. "Build, Flash and Start a Monitor" esp-idf project
 
 ### When you want to flash the initial nvs partion values (usersettings) to the nvs partition
 1. Precondition: Project including the custom partition table should have been flashed to the ESP32

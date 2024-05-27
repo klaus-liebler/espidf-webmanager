@@ -1,14 +1,16 @@
 import http from "node:http"
 import * as fs from "node:fs"
-import * as flatbuffers from 'flatbuffers'
-import { WebSocketServer, WebSocket, RawData } from "ws"
+import * as flatbuffers from "flatbuffers"
+import { WebSocketServer, WebSocket } from "ws"
 import { ResponseSystemData } from "./generated/flatbuffers/webmanager/response-system-data"
 import { PartitionInfo } from "./generated/flatbuffers/webmanager/partition-info";
 import { Mac6, } from "./generated/flatbuffers/webmanager/mac6";
 import { NotifyLiveLogItem } from "./generated/flatbuffers/webmanager/notify-live-log-item";
 import { AccessPoint } from "./generated/flatbuffers/webmanager/access-point";
-import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, NotifyEnrollNewFinger, RequestEnrollNewFinger, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity } from "./generated/flatbuffers/webmanager";
-import { createTimeseries } from "./timeseries_generator";
+import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, NotifyEnrollNewFinger, RequestEnrollNewFinger, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity, Uint8x32 } from "./generated/flatbuffers/webmanager";
+import { processScheduler_RequestScheduler } from "./helper/schedule_generator"
+import { createTimeseries } from "./helper/timeseries_generator"
+import { RequestScheduler } from "./generated/flatbuffers/scheduler/request-scheduler";
 
 
 const PORT = 3000;
@@ -44,9 +46,24 @@ function sendResponseSystemData(ws: WebSocket) {
 
 function sendResponseFingerprintSensorInfo(ws: WebSocket) {
     let b = new flatbuffers.Builder(1024);
-    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingerprintSensorInfo,
-        ResponseFingerprintSensorInfo.createResponseFingerprintSensorInfo(b, 42, 43, 3, 0x55AA55AA, 1, 6, b.createString("algVer"), b.createString("fwVer"))
-        ));
+    var usedIndices =new Array(32).fill(0);
+    usedIndices[0]=0b10101010;
+    usedIndices[1]=0b01010101;
+    
+    var alg=b.createString("AlgVer1.1")
+    var fw=b.createString("FwVer1.2")
+    ResponseFingerprintSensorInfo.startResponseFingerprintSensorInfo(b);
+    ResponseFingerprintSensorInfo.addAlgVer(b, alg);
+    ResponseFingerprintSensorInfo.addFwVer(b, fw);
+    ResponseFingerprintSensorInfo.addBaudRateTimes9600(b, 6);
+    ResponseFingerprintSensorInfo.addDataPacketSizeCode(b, 2);
+    ResponseFingerprintSensorInfo.addDeviceAddress(b, 0xffff);
+    ResponseFingerprintSensorInfo.addLibrarySizeMax(b, 1500);
+    ResponseFingerprintSensorInfo.addLibrarySizeUsed(b, 2);
+    ResponseFingerprintSensorInfo.addLibraryUsedIndices(b, Uint8x32.createUint8x32(b, usedIndices));
+    ResponseFingerprintSensorInfo.addSecurityLevel(b, 3)
+    ResponseFingerprintSensorInfo.addStatus(b, 0);
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingerprintSensorInfo, ResponseFingerprintSensorInfo.endResponseFingerprintSensorInfo(b)));
     ws.send(b.asUint8Array());
 }
 
@@ -54,8 +71,8 @@ function sendResponseFingerprintSensorInfo(ws: WebSocket) {
 function sendResponseFingers(ws: WebSocket) {
     let b = new flatbuffers.Builder(1024);
     let fingersOffset = ResponseFingers.createFingersVector(b, [
-        Finger.createFinger(b, b.createString("Klaus rechts mitte"), 1),
-        Finger.createFinger(b, b.createString("Steffi links mitte"), 2)
+        Finger.createFinger(b, b.createString("Klaus rechts mitte"), 1, 0, 1),
+        Finger.createFinger(b, b.createString("Steffi links mitte"), 2, 5, 1)
 
     ]);
     b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingers,
@@ -224,8 +241,11 @@ function process(buffer: Buffer, ws: WebSocket) {
         case Requests.RequestFingers:
             setTimeout(()=>sendResponseFingers(ws), 100);
             break;
-        case Requests.RequestEnrollNewFinger: {}
+        case Requests.RequestEnrollNewFinger:
             setTimeout(()=>sendResponseEnrollNewFinger(ws, <RequestEnrollNewFinger>mw.request(new RequestEnrollNewFinger())), 100);
+        case Requests.scheduler_RequestScheduler:
+            setTimeout(()=>processScheduler_RequestScheduler(ws, <RequestScheduler>mw.request(new RequestScheduler())), 100);
+            break;
         default:
             break;
     }

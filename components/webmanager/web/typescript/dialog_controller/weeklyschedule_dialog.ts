@@ -1,13 +1,14 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { html } from "lit-html";
-import { DialogController } from "../screen_controller/dialog_controller";
+import { DialogController } from "./dialog_controller";
 
 const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const startHour=6;
 enum MarkingMode{TOGGLE,ON,OFF};
 export class WeeklyScheduleDialog extends DialogController {
     
-    constructor(private pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, private referenceHandle:any){
+    
+    constructor(private header:string, private initialValue: Uint8Array|null, private pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, private referenceHandle:any){
         super()
     }
 
@@ -16,15 +17,29 @@ export class WeeklyScheduleDialog extends DialogController {
     private tblBody:Ref<HTMLTableSectionElement>= createRef();
    
     public Show(){
-        this.setAll(false);
+        if(this.initialValue){
+            
+            for(var d=0;d<7;d++){
+                for(var two_hours_interval=0;two_hours_interval<12;two_hours_interval++){
+                    var value=this.initialValue[d*12+two_hours_interval];
+                    for(var quarterhour=0;quarterhour<8;quarterhour++){
+                        var shouldBeMarked=value & (0b10000000>>quarterhour)
+                        this.setSelected(d, two_hours_interval*8+quarterhour, shouldBeMarked>0);
+                    }
+                    
+                }
+            }
+        }else{
+            this.setAll(false);
+        }
         this.dialog.value!.showModal();
     }
+
+
     private tdMousedown(e: MouseEvent) {
         //console.log(`mousedown @ ${(<HTMLElement>e.target).innerText}`)
         this.isSelecting = true;
         this.tdMouseenter(e)
-        
-        
         e.preventDefault(); // Verhindert die Textauswahl
     };
     private tdMouseenter(e: MouseEvent) {
@@ -81,20 +96,27 @@ export class WeeklyScheduleDialog extends DialogController {
         }
     }
 
-    private save() {
-        var t=this.tblBody.value!;
-        var arr = new Uint8Array(96);
-        for(var fifteen_minutes_slot=0;fifteen_minutes_slot<96;fifteen_minutes_slot++){
-            var week=0;
-            for(const d of [6,5,4,3,2,1,0]){
-                var sourceMarked=this.isSelected(d, fifteen_minutes_slot);
-                week&=sourceMarked?1:0;
-                week<<=1
+    protected cancelHandler() {
+        this.dialog.value!.close('Cancel')
+        this.pHandler?.(false, this.referenceHandle, null);
+    }
+
+    protected okHandler() {
+        console.log("Save clicked")
+        var arr = new Uint8Array(84);
+        for(const d of [6,5,4,3,2,1,0]){
+            for(var two_hours_interval=0;two_hours_interval<12;two_hours_interval++){
+                var value=0;
+                for(var quarterhour=0;quarterhour<8;quarterhour++){
+                    var sourceMarked=this.isSelected(d, two_hours_interval*8+quarterhour);
+                    value&=sourceMarked?1:0;
+                    value<<=1 //MSB ist dann immer die erste viertelstunde im 2h-Interval-byte
+                }
+                arr[d*12+two_hours_interval]=value;
             }
-            arr[fifteen_minutes_slot]=week;
         }
+        this.dialog.value!.close("Ok");
         this.pHandler?.(true, this.referenceHandle, arr);
-        this.dialog.value!.close();
     }
 
     
@@ -115,7 +137,7 @@ export class WeeklyScheduleDialog extends DialogController {
         return html`
     <dialog ${ref(this.dialog)}>
         <header>
-            <span>Weekly Schedule Dialog</span>
+            <span>${this.header}</span>
             <button @click=${()=>this.dialog.value!.close("cancelled")} type="button">&times;</button>
         </header>
         <main>
@@ -150,7 +172,7 @@ export class WeeklyScheduleDialog extends DialogController {
                 </tbody>
             </table>
         </main>
-        <footer><input @click=${(e:MouseEvent) => this.save()} type="button" value="Save" /><input @click=${(e:MouseEvent) => this.save()} type="button" value="Cancel" /></footer>
+        <footer><input @click=${() => this.okHandler()} type="button" value="OK"></input><input @click=${() => this.cancelHandler()} type="button" value="Cancel"></input></footer>
     </dialog>
     `}
 

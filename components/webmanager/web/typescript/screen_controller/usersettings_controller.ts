@@ -2,13 +2,11 @@ import { RequestGetUserSettings, RequestSetUserSettings, RequestWrapper, Request
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import us from "../../generated/usersettings/usersettings"
-import { BooleanItem, BooleanItemRT, ConfigGroup, ConfigItemRT, EnumItem, EnumItemRT, IntegerItem, IntegerItemRT, StringItem, StringItemRT, ValueUpdater } from "../utils/usersettings_base";
+import { BooleanItemRT, ConfigGroup, ConfigItemRT, EnumItemRT, IntegerItemRT, StringItemRT, ValueUpdater } from "../utils/usersettings_base";
 import { TemplateResult, html, render } from "lit-html";
 import { Severity } from "../utils/common";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import {classMap} from 'lit-html/directives/class-map.js';
 import { IAppManagement } from "../utils/interfaces";
-import { styleMap } from "lit-html/directives/style-map.js";
 
 
 class ConfigGroupRT{

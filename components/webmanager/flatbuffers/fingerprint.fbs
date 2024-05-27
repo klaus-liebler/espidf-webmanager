@@ -33,13 +33,13 @@ table ResponseDeleteFinger{
 }
 
 table RequestStoreFingerAction{
-    name:string;
+    fingerIndex:uint16;
     actionIndex:uint16;
 }
 table ResponseStoreFingerAction{}
 
 table RequestStoreFingerTimetable{
-    name:string;
+    fingerIndex:uint16;
     timetableIndex:uint16;
 }
 table ResponseStoreFingerTimetable{}
@@ -62,10 +62,16 @@ table ResponseRenameFinger{
     errorcode:uint16;
 }
 
+struct Uint8x32{
+    v:[uint8:32];
+}
+
 table RequestFingerprintSensorInfo{}
 table ResponseFingerprintSensorInfo{
     status:uint16; //Status register Contents of system status register 0 2
-    librarySize:uint16;//System identifier code Fixed value: 0x0000 1 2
+    librarySizeMax:uint16;//System identifier code Fixed value: 0x0000 1 2
+    librarySizeUsed:uint16;
+    libraryUsedIndices:Uint8x32;
     securityLevel:uint8;
     deviceAddress:uint32;
     dataPacketSizeCode:uint8;

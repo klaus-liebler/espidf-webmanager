@@ -5,6 +5,7 @@ include "timeseries.fbs";
 include "websensact.fbs";
 include "fingerprint.fbs";
 include "canmonitor.fbs";
+include "scheduler.fbs";
 
 namespace webmanager;
 
@@ -51,6 +52,9 @@ union Responses{
     ResponseFingers,
     ResponseCancelInstruction,
 //fingerprint end
+//scheduler start
+    scheduler.ResponseScheduler,
+//scheduler end
 }
 
 union Requests{
@@ -76,6 +80,9 @@ union Requests{
     RequestFingers,
     RequestCancelInstruction,
 //fingerprint end
+//scheduler start
+    scheduler.RequestScheduler,
+//scheduler end
     }
 
 

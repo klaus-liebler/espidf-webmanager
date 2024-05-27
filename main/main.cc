@@ -18,6 +18,7 @@
 #include <esp_tls.h>
 #include <webmanager.hh> //include esp_https_server before!!!
 #include <timeseries.hh>
+#include <timetable.hh>
 #include <fingerprint.hh>
 #include <canmonitor.hh>
 #include <interfaces.hh>
@@ -29,12 +30,13 @@
 #define NVS_FINGER_NAMESPACE "finger"
 #define NVS_FINGER_ACTION_NAMESPACE "finger_act"
 #define NVS_FINGER_TIMETABLE_NAMESPACE "finger_time"
+#define NVS_TIMETABLE_NAMESPACE "timetable"
 
 FINGERPRINT::M *fpm{nullptr};
 CANMONITOR::M *canmonitor{nullptr};
 BUZZER::M *buzzer{nullptr};
 LED::M *led{nullptr};
-
+#if 0
 constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
 constexpr gpio_num_t PIN_485DE{GPIO_NUM_33};
 constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_12};
@@ -58,6 +60,30 @@ constexpr gpio_num_t PIN_485DI{GPIO_NUM_25};
 constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_26};
 //constexpr gpio_num_t PIN_IO26{GPIO_NUM_26};
 constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_27};
+#endif
+
+
+constexpr gpio_num_t PIN_FINGER_TX_HOST{GPIO_NUM_40};
+//constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_38};
+constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_7};
+constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_39};
+
+constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_6};
+constexpr gpio_num_t PIN_MOTOR{GPIO_NUM_42};
+constexpr gpio_num_t PIN_LED{GPIO_NUM_2};
+
+constexpr gpio_num_t PIN_I2C_SCL{GPIO_NUM_4};
+constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_5};
+
+
+constexpr gpio_num_t PIN_CAN_TX{GPIO_NUM_11};
+constexpr gpio_num_t PIN_CAN_RX{GPIO_NUM_10};
+
+
+
+
+
+
 
 constexpr twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
 constexpr twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
@@ -65,7 +91,7 @@ constexpr twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_T
 LED::BlinkPattern SLOW(300, 1700);
 LED::BlinkPattern FAST(200, 200);
 
-class Webmanager2Fingerprint2Hardware : public MessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
+class Webmanager2Fingerprint2Hardware : public iMessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
 {
 private:
     MessageSender *callback{nullptr};
@@ -141,6 +167,9 @@ public:
         case 0:
             this->fingerDetected = millis();
             break;
+        case 4:
+            buzzer->PlaySong(BUZZER::RINGTONE_SONG::MISSIONIMP);
+            break;
         
         default:
             break;
@@ -193,26 +222,33 @@ public:
 
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseRenameFinger,
                                                        webmanager::CreateResponseRenameFinger(b, (uint16_t)fpm->TryRename(oldName, newName)).Union());
+            break;
         }
         case webmanager::Requests_RequestFingerprintSensorInfo:
         {
             auto p = fpm->GetAllParams();
+            
+            webmanager::Uint8x32 usedIndices(p->libraryIndicesUsed);
+            
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseFingerprintSensorInfo,
                                                        webmanager::CreateResponseFingerprintSensorInfoDirect(b,
                                                                                                              p->status,
-                                                                                                             p->librarySize,
+                                                                                                             p->librarySizeMax,
+                                                                                                             p->librarySizeUsed,
+                                                                                                             &usedIndices,
                                                                                                              p->securityLevel,
                                                                                                              p->deviceAddress,
                                                                                                              p->dataPacketSizeCode,
                                                                                                              p->baudRateTimes9600,
                                                                                                              p->algVer, p->fwVer)
                                                            .Union());
+            break;
         }
 
         case webmanager::Requests::Requests_RequestFingers:
         {
             nvs_iterator_t it{nullptr};
-            esp_err_t res = nvs_entry_find("nvs", NVS_FINGER_NAMESPACE, NVS_TYPE_U16, &it);
+            esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_TYPE_U16, &it);
             std::vector<flatbuffers::Offset<webmanager::Finger>> fingers_vector;
             while (res == ESP_OK)
             {
@@ -237,6 +273,20 @@ public:
             this->fingerDetected = millis();
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseOpenDoor,
                                                        webmanager::CreateResponseOpenDoor(b).Union());
+        }
+
+        case webmanager::Requests::Requests_RequestStoreFingerAction:
+        {
+            fpm->TryStoreFingerAction(mw->request_as_RequestStoreFingerAction()->fingerIndex(), mw->request_as_RequestStoreFingerAction()->actionIndex());
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerAction,
+                                                       webmanager::CreateResponseStoreFingerAction(b).Union());
+        }
+
+        case webmanager::Requests::Requests_RequestStoreFingerTimetable:
+        {
+            fpm->TryStoreFingerTimetable(mw->request_as_RequestStoreFingerTimetable()->fingerIndex(), mw->request_as_RequestStoreFingerTimetable()->timetableIndex());
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerTimetable,
+                                                       webmanager::CreateResponseStoreFingerTimetable(b).Union());
         }
         default:
             return ESP_FAIL;
@@ -272,10 +322,12 @@ extern "C" void app_main(void)
     nvs_handle_t nvsFingerHandle;
     nvs_handle_t nvsFingerTimetableHandle;
     nvs_handle_t nvsFingerActionHandle;
+    nvs_handle_t nvsTimetableHandle;
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsFingerHandle));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_TIMETABLE_NAMESPACE, NVS_READWRITE, &nvsFingerTimetableHandle));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_ACTION_NAMESPACE, NVS_READWRITE, &nvsFingerActionHandle));
-    
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_TIMETABLE_NAMESPACE, NVS_READWRITE, &nvsTimetableHandle));
+
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
     led = new LED::M(PIN_LED, true);
@@ -284,21 +336,23 @@ extern "C" void app_main(void)
     Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
     w2f->begin();
 
+    TIMETABLE::Webmanager2Timetable *w2t = new TIMETABLE::Webmanager2Timetable(nvsTimetableHandle);
+
     fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
-    fpm->begin(PIN_FINGER_TX, PIN_FINGER_RX);
+    fpm->begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);
 
     canmonitor = new CANMONITOR::M(w2f);
     canmonitor->begin(&t_config, &g_config);
 
     webmanager::M *wman = webmanager::M::GetSingleton();
-    ESP_ERROR_CHECK(wman->Init("ESP32AP_", "password", "finger", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
+    ESP_ERROR_CHECK(wman->Init("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
 
     ESP_ERROR_CHECK(httpd_ssl_start(&http_server, &conf));
     ESP_LOGI(TAG, "HTTPD with SSL started");
     wman->RegisterHTTPDHandlers(http_server);
     ESP_LOGI(TAG, "HTTPD handlers registered");
-    MessageReceiver *plugins[] = {w2f};
-    wman->SetPlugins(plugins, 1);
+    std::vector<iMessageReceiver*>plugins{w2f, w2t};
+    wman->SetPlugins(&plugins);
     ESP_LOGI(TAG, "Webmanager plugins registered");
     wman->CallMeAfterInitializationToMarkCurrentPartitionAsValid();
     ESP_LOGI(TAG, "Overall startup completed. Partition marked as valid. Eternal loop begins.");
