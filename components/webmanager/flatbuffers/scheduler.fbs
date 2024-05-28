@@ -1,0 +1,103 @@
+namespace scheduler;
+
+struct OneWeekIn15MinutesData{
+    v:[uint8:84];
+}
+
+table OneWeekIn15Minutes{
+    data:OneWeekIn15MinutesData;
+}
+
+table Predefined{}
+
+table SunRandom{
+    offset_minutes:uint16;
+    random_minutes:uint16;
+}
+
+union uSchedule{
+    Predefined,
+    OneWeekIn15Minutes,
+    SunRandom,
+}
+
+enum eSchedule:byte{
+    Predefined,
+    OneWeekIn15Minutes,
+    SunRandom,
+}
+
+table ResponseSchedulerListItem{
+    name:string;
+    type: eSchedule;
+}
+
+table ResponseSchedulerList{
+    items:[ResponseSchedulerListItem];//List
+}
+
+table RequestSchedulerList{
+}
+
+table RequestSchedulerOpen{
+    name:string;
+    type: eSchedule;
+    
+}
+
+table ResponseSchedulerOpen{
+    name:string;
+    schedule:uSchedule;
+}
+
+table RequestSchedulerSave{
+    name:string;
+    schedule:uSchedule;
+}
+
+table ResponseSchedulerSave{
+    name:string;
+}
+
+
+table RequestSchedulerRename{
+    old_name:string;
+    new_name:string;
+}
+
+table ResponseSchedulerRename{
+    old_name:string;
+    new_name:string;
+}
+
+table RequestSchedulerDelete{
+    name:string;
+}
+
+table ResponseSchedulerDelete{
+    name:string;
+}
+
+union uRequestScheduler{
+    RequestSchedulerList,   
+    RequestSchedulerOpen,
+    RequestSchedulerSave,
+    RequestSchedulerRename,
+    RequestSchedulerDelete,
+}
+
+table RequestScheduler{
+    content:uRequestScheduler;
+}
+
+union uResponseScheduler{
+    ResponseSchedulerList,   
+    ResponseSchedulerOpen,
+    ResponseSchedulerSave,
+    ResponseSchedulerRename,
+    ResponseSchedulerDelete,
+}
+
+table ResponseScheduler{
+    content:uResponseScheduler;
+}

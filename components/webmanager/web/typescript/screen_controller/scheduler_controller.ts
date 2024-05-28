@@ -1,174 +1,36 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { Finger, NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerTimetable, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
+import { RequestDeleteFinger, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerTimetable, RequestWrapper, Requests, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
-import { Html, Severity } from "../utils/common";
-import { TemplateResult, html, render, svg } from "lit-html";
+import { TemplateResult, html, render } from "lit-html";
 
 
 import calendarPlus from '../../svgs/regular/calendar-plus.svg?raw'
-import calendarXMark from '../../svgs/regular/calendar-xmark.svg?raw'
-import penToSquare from '../../svgs/regular/pen-to-square.svg?raw'
-import folderOpen from '../../svgs/regular/folder-open.svg?raw'
-import floppyDisk from '../../svgs/regular/floppy-disk.svg?raw'
 import { unsafeSVG } from "lit-html/directives/unsafe-svg.js";
 import { ResponseScheduler } from "../../generated/flatbuffers/scheduler/response-scheduler";
 import { uResponseScheduler } from "../../generated/flatbuffers/scheduler/u-response-scheduler";
 import { ResponseSchedulerList } from "../../generated/flatbuffers/scheduler/response-scheduler-list";
 import { ResponseSchedulerListItem } from "../../generated/flatbuffers/scheduler/response-scheduler-list-item";
-import { uSchedule } from "../../generated/flatbuffers/scheduler/u-schedule";
-import { WeeklyScheduleDialog } from "../dialog_controller/weeklyschedule_dialog";
-import { IAppManagement } from "../utils/interfaces";
 import { RequestScheduler } from "../../generated/flatbuffers/scheduler/request-scheduler";
-import { RequestSchedulerOpen } from "../../generated/flatbuffers/scheduler/request-scheduler-open";
 import { uRequestScheduler } from "../../generated/flatbuffers/scheduler/u-request-scheduler";
 import { eSchedule } from "../../generated/flatbuffers/scheduler/e-schedule";
 import { RequestSchedulerList } from "../../generated/flatbuffers/scheduler/request-scheduler-list";
 import { ResponseSchedulerOpen } from "../../generated/flatbuffers/scheduler/response-scheduler-open";
-import { OneWeekIn15Minutes } from "../../generated/flatbuffers/scheduler/one-week-in15-minutes";
-import { DialogController, OkCancelDialog, SimpleDialogController } from "../dialog_controller/dialog_controller";
-import { SunRandom } from "../../generated/flatbuffers/scheduler/sun-random";
+import {ScheduleItem, OneWeekIn15MinutesSchedule, SunRandomSchedule, PredefinedSchedule} from "../utils/schedule_items"
+import {CreateNewScheduleDialog} from "../dialog_controller/CreateNewScheduleDialog.ts"
 
-export abstract class ScheduleItem {
-
-    constructor(protected readonly name:string, protected readonly type:string, protected readonly appManagement:IAppManagement) { }
-    
-    public OverallTemplate=()=>html`
-    <tr>
-        <td style='width:1%; white-space:nowrap'>${this.name}</td>
-        <td style='width:1%; white-space:nowrap'>${this.type}</td>
-        <td>${this.CoreEditTemplate()}</td>
-    </tr>
-    `
-    protected abstract CoreEditTemplate:()=>TemplateResult<1>;
-    public abstract OnResponseSchedulerOpen(m:ResponseSchedulerOpen):void;
-}
-
-class PredefinedSchedule extends ScheduleItem{
-    constructor(name:string, appManagement:IAppManagement){
-        super(name, "Predefined", appManagement);
-    }
-
-    public OnResponseSchedulerOpen(m:ResponseSchedulerOpen):void{
-        return;
-    }
-
-    protected CoreEditTemplate=()=>html``
-}
-
-class SunRandomScheduleEditorDialog extends DialogController{
-    
-    protected inputOffset:Ref<HTMLInputElement> = createRef();
-    protected inputRandom:Ref<HTMLInputElement> = createRef();
-
-    constructor(protected nameOfSchedule: string, private offsetMinutes:number, private randomMinutes:number, protected handler: ((ok: boolean, offsetMinutes:number, randomMinutes:number) => any) | undefined) {
-        super()
-    }
-
-    protected cancelHandler() {
-        this.dialog.value!.close('Cancel')
-        this.handler?.(false, 0,0)
-    }
-
-    protected okHandler() {
-        this.dialog.value!.close('Ok')
-        this.handler?.(true, this.inputOffset.value!.valueAsNumber,this.inputRandom.value!.valueAsNumber);
-    }
-
-    protected backdropClickedHandler(e: MouseEvent) {
-        if (e.target === this.dialog) {
-            this.cancelHandler();
-        }
-    }
-
-    public Template() {
-        return html`
-    <dialog @cancel=${() => this.cancelHandler()} @click=${(e: MouseEvent) => this.backdropClickedHandler(e)} ${ref(this.dialog)}>
-        <header>
-            <span>Edit SunRandom Schedule "${this.nameOfSchedule}"</span>
-            <button @click=${() => this.dialog.value!.close("cancelled")} type="button">&times;</button>
-        </header>
-        <main>
-            <label><input ${ref(this.inputOffset)} type="number" value=${this.offsetMinutes} />Offset [minutes]</label>
-            <label><input ${ref(this.inputRandom)} type="number" value=${this.randomMinutes} />Random [minutes]</label>
-        </main>
-        <footer><input @click=${() => this.okHandler()} type="button" value="OK"></input><input @click=${() => this.cancelHandler()} type="button" value="Cancel"></input></footer>
-    </dialog>`}
-
-}
-class SunRandomSchedule extends ScheduleItem{
-    
-    constructor(name:string, appManagement:IAppManagement){
-        super(name, "SunRandom", appManagement);
-    }
-
-    private editDialogHandler(ok: boolean, offsetMinutes: number, randomMinutes: number){
-        console.info("In SunRandomSchedule: Dialog closed");
-    }
-
-    public OnResponseSchedulerOpen(m:ResponseSchedulerOpen):void{
-        if(m.scheduleType()!=uSchedule.SunRandom) return;
-        var rso = <SunRandom>m.schedule(new SunRandom())
-        this.appManagement.showDialog(new SunRandomScheduleEditorDialog(this.name, rso.offsetMinutes(), rso.randomMinutes(), this.editDialogHandler));
-    }
-
-    private btnEditClicked() {
-        let b = new flatbuffers.Builder(256);       
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerOpen, 
-                    RequestSchedulerOpen.createRequestSchedulerOpen(b, b.createString(this.name), eSchedule.SunRandom)
-                )
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
-    }
-
-    protected CoreEditTemplate=()=>html`<button @click=${()=>this.btnEditClicked()}>Edit</button>`
-}
-
-class OneWeekIn15MinutesSchedule extends ScheduleItem{
-
-    
-    constructor(name:string, appManagement:IAppManagement){
-        super(name, "OneWeekIn15Minutes", appManagement);
-    }
-
-    public OnResponseSchedulerOpen(m:ResponseSchedulerOpen):void{
-        if(m.scheduleType()!=uSchedule.OneWeekIn15Minutes) return;
-        var rso = <OneWeekIn15Minutes>m.schedule(new OneWeekIn15Minutes())
-        var data = new Uint8Array(84);
-        for(var i=0;i<84;i++){data[i]=rso.data().v(i)}
-        this.appManagement.showWeeklyTimetableDialog(`Weekly Schedule ${m.name()}`, data,this.editDialogHandler, null);
-    }
-
-    private editDialogHandler(ok: boolean, referenceHandle: any, value: Uint8Array){
-        console.info("In OneWeekIn15MinutesSchedule: WeeklyScheduleDialog closed");
-    }
-
-    private btnEditClicked(e:MouseEvent){
-
-        let b = new flatbuffers.Builder(256);       
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerOpen, 
-                    RequestSchedulerOpen.createRequestSchedulerOpen(b, b.createString(this.name), eSchedule.OneWeekIn15Minutes)
-                )
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
-    }
-
-    protected CoreEditTemplate=()=>html`<button @click=${(e:MouseEvent)=>this.btnEditClicked(e)}>Edit</button>`
-}
 
 export class SchedulerScreenController extends ScreenController {
-    btnNew() {
-        throw new Error("Method not implemented.");
+    private btnNew() {
+        this.appManagement.showDialog(new CreateNewScheduleDialog(Array.from(this.name2item.keys()), this.appManagement,(ok, item)=>{
+            if(!ok) return;
+            this.name2item.set(item.name, item);
+            var itemTemplates:Array<TemplateResult<1>>=[];
+            for(const i of this.name2item.values()){
+                itemTemplates.push(i.OverallTemplate())
+            }
+            render(itemTemplates, this.tblBody!.value);
+        }));
     }
 
     private spanTimetableName: Ref<HTMLTableSectionElement> = createRef();
@@ -180,9 +42,7 @@ export class SchedulerScreenController extends ScreenController {
     <h1>Schedule Definitions</h1>
         
         <div class="buttons">
-        
-            <button @click=${() => this.btnNew()}>${unsafeSVG(calendarPlus)} New</button>
-
+            <button class="withsvg" @click=${() => this.btnNew()}>${unsafeSVG(calendarPlus)}<span>New<span></button>
         </div>
         
 

@@ -232,6 +232,11 @@ th {
   padding: 8px;
 }
 
+td.minwidth{
+  width:1%; 
+  white-space:nowrap;
+}
+
 tr:nth-child(odd) {
   background-color: #dddddd;
 }
@@ -327,5 +332,14 @@ p {
   gap: 15px;
   margin-top: 10px;
   margin-bottom: 10px;
+}
+
+button.withsvg{
+  display: flex;
+  align-items: center;
+  padding: 5px;
+  span{
+    margin-left: 5px;
+  }
 }
 
