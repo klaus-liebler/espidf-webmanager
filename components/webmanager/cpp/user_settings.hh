@@ -109,8 +109,7 @@ namespace webmanager
             std::vector<flatbuffers::Offset<flatbuffers::String>> keys_vector;
 
             nvs_handle_t nvs_handle{0};
-            // TODO consider custom partition name
-            RETURN_ON_ERROR(nvs_open(group->groupKey, NVS_READWRITE, &nvs_handle));
+            RETURN_ON_ERROR(nvs_open_from_partition(partitionName, group->groupKey, NVS_READWRITE, &nvs_handle));
             ESP_LOGI(TAG, "Successfully opened partition, group: %s with %u items. Updating %lu items", group->groupKey, group->setting_len, req->settings()->size());
 
             auto settings = req->settings();
@@ -202,8 +201,7 @@ namespace webmanager
             ESP_LOGI(TAG, "In handleRequestGetUserSettings for GroupKey %s ItemCount %u", groupKey, group->setting_len);
 
             nvs_handle_t nvs_handle{0};
-            // TODO consider custom partition name
-            RETURN_ON_ERROR(nvs_open(group->groupKey, NVS_READONLY, &nvs_handle));
+            RETURN_ON_ERROR(nvs_open_from_partition(partitionName, group->groupKey, NVS_READONLY, &nvs_handle));
             ESP_LOGI(TAG, "Successfully opened partition, reading %u items", group->setting_len);
             flatbuffers::FlatBufferBuilder b(1024);
             std::vector<flatbuffers::Offset<SettingWrapper>> sw_vector;

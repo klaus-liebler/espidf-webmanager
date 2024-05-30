@@ -18,7 +18,7 @@
 #include <esp_tls.h>
 #include <webmanager.hh> //include esp_https_server before!!!
 #include <timeseries.hh>
-#include <timetable.hh>
+#include <scheduler.hh>
 #include <fingerprint.hh>
 #include <canmonitor.hh>
 #include <interfaces.hh>
@@ -30,7 +30,7 @@
 #define NVS_FINGER_NAMESPACE "finger"
 #define NVS_FINGER_ACTION_NAMESPACE "finger_act"
 #define NVS_FINGER_TIMETABLE_NAMESPACE "finger_time"
-#define NVS_TIMETABLE_NAMESPACE "timetable"
+#define NVS_SCHEDULER_NAMESPACE "scheduler"
 
 FINGERPRINT::M *fpm{nullptr};
 CANMONITOR::M *canmonitor{nullptr};
@@ -322,11 +322,11 @@ extern "C" void app_main(void)
     nvs_handle_t nvsFingerHandle;
     nvs_handle_t nvsFingerTimetableHandle;
     nvs_handle_t nvsFingerActionHandle;
-    nvs_handle_t nvsTimetableHandle;
+    nvs_handle_t nvsSchedulerHandle;
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsFingerHandle));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_TIMETABLE_NAMESPACE, NVS_READWRITE, &nvsFingerTimetableHandle));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_ACTION_NAMESPACE, NVS_READWRITE, &nvsFingerActionHandle));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_TIMETABLE_NAMESPACE, NVS_READWRITE, &nvsTimetableHandle));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerHandle));
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
@@ -336,7 +336,7 @@ extern "C" void app_main(void)
     Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
     w2f->begin();
 
-    TIMETABLE::Webmanager2Timetable *w2t = new TIMETABLE::Webmanager2Timetable(nvsTimetableHandle);
+    SCHEDULER::Scheduler *w2t = new SCHEDULER::Scheduler(nvsSchedulerHandle);
 
     fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
     fpm->begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);

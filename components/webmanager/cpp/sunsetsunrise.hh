@@ -17,6 +17,6 @@ namespace sunsetsunrise
     // Time formula
     // Tdays is the number of days since Jan 1 2000, and replaces T as the Tropical Century. T = Tdays / 36525.0
     double TimeFormulaDouble(double *DK, double Tdays);
-    void DuskTillDawn(double julianDay, double latitudeRadiant, double longitudeRadiant, eDawn dawn);
+    void DuskTillDawn(double julianDay, double latitudeRadiant, double longitudeRadiant, eDawn dawn, double &sunriseHour, double &sunsetHour);
 }
 

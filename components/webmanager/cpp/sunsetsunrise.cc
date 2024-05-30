@@ -68,7 +68,7 @@ namespace sunsetsunrise
         return dRA;
     }
 
-    void DuskTillDawn(double julianDay, double latitudeRadiant, double longitudeRadiant, eDawn dawn)
+    void DuskTillDawn(double julianDay, double latitudeRadiant, double longitudeRadiant, eDawn dawn, double &sunriseHour, double &sunsetHour)
     {
 
         double Tdays = julianDay - JD2000; // number of days since Jan 1 2000
@@ -80,22 +80,16 @@ namespace sunsetsunrise
         double Zeitgleichung = TimeFormulaDouble(&DK, Tdays);
        
         double Zeitdifferenz = 12.0*acos((sin_h - sin(latitudeRadiant) * sin(DK)) / (cos(latitudeRadiant) * cos(DK)))/pi;
-         printf("Zeitgleichung: DK:%f return %f; Zeitdifferenz=%f; sin_h=%f; sin(lat)=%f\n", DK, Zeitgleichung, Zeitdifferenz, sin_h, sin(latitudeRadiant));
+        // printf("Zeitgleichung: DK:%f return %f; Zeitdifferenz=%f; sin_h=%f; sin(lat)=%f\n", DK, Zeitgleichung, Zeitdifferenz, sin_h, sin(latitudeRadiant));
         double AufgangOrtszeit = 12.0 - Zeitdifferenz - Zeitgleichung;
         double UntergangOrtszeit = 12.0f + Zeitdifferenz - Zeitgleichung;
         double AufgangWeltzeit = AufgangOrtszeit - longitudeRadiant/(RAD * 15.0f);
         double UntergangWeltzeit = UntergangOrtszeit - longitudeRadiant/(RAD * 15.0f);
         double Aufgang = AufgangWeltzeit + Zeitzone + (1 / 120.0f); // In Stunden, with rounding to nearest minute (1/60 * .5)
-
-        Aufgang = std::fmod(Aufgang, 24.0f); // force 0 <= x < 24.0
-        int AufgangStunden = (int)Aufgang;
-        int AufgangMinuten = (int)(60.0f * std::fmod(Aufgang, 1.0f));
         double Untergang = UntergangWeltzeit + Zeitzone;
 
-        Untergang = std::fmod(Untergang, 24.0f);
-        int UntergangStunden = (int)Untergang;
-        int UntergangMinuten = (int)(60.0f * std::fmod(Untergang, 1.0f));
-        printf("Aufgang: %d:%d, Untergang %d:%d", AufgangStunden, AufgangMinuten, UntergangStunden, UntergangMinuten);
+        sunriseHour = std::fmod(Aufgang, 24.0f); // force 0 <= x < 24.0
+        sunsetHour = std::fmod(Untergang, 24.0f);      
     }
 }
 /*
@@ -104,7 +98,15 @@ int main()
     double today = 2460318.5;
     double latDeg = 52.0965;
     double lonDeg = 7.6171;
-    sunsetsunrise::DuskTillDawn(today, latDeg * sunsetsunrise::RAD, lonDeg * sunsetsunrise::RAD, sunsetsunrise::DAWN_NORMAL);
+    double Aufgang;
+    double Untergang;
+    sunsetsunrise::DuskTillDawn(today, latDeg * sunsetsunrise::RAD, lonDeg * sunsetsunrise::RAD, sunsetsunrise::DAWN_NORMAL, Aufgang, Untergang);
+    int AufgangStunden = (int)Aufgang;
+    int AufgangMinuten = (int)(60.0f * std::fmod(Aufgang, 1.0f));
+
+    int UntergangStunden = (int)Untergang;
+    int UntergangMinuten = (int)(60.0f * std::fmod(Untergang, 1.0f));
+    printf("Aufgang: %d:%d, Untergang %d:%d", AufgangStunden, AufgangMinuten, UntergangStunden, UntergangMinuten);
     return 0;
 }
 */

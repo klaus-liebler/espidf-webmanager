@@ -29,12 +29,11 @@ export class SchedulerScreenController extends ScreenController {
             for(const i of this.name2item.values()){
                 itemTemplates.push(i.OverallTemplate())
             }
-            render(itemTemplates, this.tblBody!.value);
+            render(itemTemplates, this.tBodySchedules!.value);
         }));
     }
 
-    private spanTimetableName: Ref<HTMLTableSectionElement> = createRef();
-    private tblBody:Ref<HTMLTableSectionElement>= createRef();
+    private tBodySchedules:Ref<HTMLTableSectionElement>= createRef();
     private name2item:Map<string, ScheduleItem>=new Map<string, ScheduleItem>();
 
     public Template = () =>{
@@ -54,7 +53,7 @@ export class SchedulerScreenController extends ScreenController {
                 <th>Edit</th>
             </tr>
             </thead>
-            <tbody ${ref(this.tblBody)}>
+            <tbody ${ref(this.tBodySchedules)}>
             </tbody>
         </table>
         `}
@@ -127,7 +126,7 @@ export class SchedulerScreenController extends ScreenController {
                     var item = list.items(i);
                     this.processItem(item, itemTemplates);
                 }
-                render(itemTemplates, this.tblBody!.value);
+                render(itemTemplates, this.tBodySchedules!.value);
                 break;
             }
             case uResponseScheduler.ResponseSchedulerOpen:{
@@ -145,27 +144,21 @@ export class SchedulerScreenController extends ScreenController {
         switch (item.type()) {
             case eSchedule.OneWeekIn15Minutes:{
                 elem= new OneWeekIn15MinutesSchedule(item.name(), this.appManagement)
-                this.name2item.set(item.name(), elem);
-                itemTemplates.push(elem.OverallTemplate())
                 break;
             }
             case eSchedule.SunRandom:{
                 elem= new SunRandomSchedule(item.name(), this.appManagement)
-                this.name2item.set(item.name(), elem);
-                itemTemplates.push(elem.OverallTemplate())
                 break;
             }
             case eSchedule.Predefined:{
                 elem= new PredefinedSchedule(item.name(), this.appManagement)
-                this.name2item.set(item.name(), elem);
-                itemTemplates.push(elem.OverallTemplate())
                 break;
             }
             default:
-                break;
+                return;
         }
-
-
+        this.name2item.set(item.name(), elem);
+        itemTemplates.push(elem.OverallTemplate())
     }
 
     private onStart_or_onRestart(){
