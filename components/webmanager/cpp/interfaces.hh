@@ -12,3 +12,8 @@ class iMessageReceiver{
     public:
     virtual esp_err_t provideWebsocketMessage(MessageSender* callback, httpd_req_t *req, httpd_ws_frame_t *ws_pkt, const webmanager::RequestWrapper *mw)=0;
 };
+
+class iScheduler{
+    public:
+    virtual uint16_t GetCurrentValueOfSchedule(const char* schedulerName)=0;
+};

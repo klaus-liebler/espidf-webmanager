@@ -38,11 +38,11 @@ table RequestStoreFingerAction{
 }
 table ResponseStoreFingerAction{}
 
-table RequestStoreFingerTimetable{
+table RequestStoreFingerSchedule{
     fingerIndex:uint16;
-    timetableIndex:uint16;
+    scheduleName:string;
 }
-table ResponseStoreFingerTimetable{}
+table ResponseStoreFingerSchedule{}
 
 table RequestDeleteAllFingers{}
 table ResponseDeleteAllFingers{

@@ -282,11 +282,11 @@ public:
                                                        webmanager::CreateResponseStoreFingerAction(b).Union());
         }
 
-        case webmanager::Requests::Requests_RequestStoreFingerTimetable:
+        case webmanager::Requests::Requests_RequestStoreFingerSchedule:
         {
-            fpm->TryStoreFingerTimetable(mw->request_as_RequestStoreFingerTimetable()->fingerIndex(), mw->request_as_RequestStoreFingerTimetable()->timetableIndex());
-            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerTimetable,
-                                                       webmanager::CreateResponseStoreFingerTimetable(b).Union());
+            fpm->TryStoreFingerScheduler(mw->request_as_RequestStoreFingerSchedule()->fingerIndex(), mw->request_as_RequestStoreFingerSchedule()->scheduleName()->c_str());
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerSchedule,
+                                                       webmanager::CreateResponseStoreFingerSchedule(b).Union());
         }
         default:
             return ESP_FAIL;
@@ -338,7 +338,7 @@ extern "C" void app_main(void)
 
     SCHEDULER::Scheduler *w2t = new SCHEDULER::Scheduler(nvsSchedulerHandle);
 
-    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
+    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, w2t, nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
     fpm->begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);
 
     canmonitor = new CANMONITOR::M(w2f);

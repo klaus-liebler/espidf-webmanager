@@ -13,7 +13,6 @@
 #include "nvs.h"
 #include "sdkconfig.h"
 #include "fingerprint_hardware.hh"
-#include "fingerprint_timer.hh"
 #include <common.hh>
 
 #define TAG "FINGER"
@@ -25,13 +24,14 @@ namespace FINGERPRINT
     {
     private:
         iFingerprintActionHandler *handler;
+        iScheduler *scheduler;
         nvs_handle_t nvsFingerName2FingerIndex;
-        nvs_handle_t nvsFingerIndex2Timetable;
+        nvs_handle_t nvsFingerIndex2Scheduler;
         nvs_handle_t nvsFingerIndex2Action;
         SemaphoreHandle_t mutex;
 
     public:
-        M(uart_port_t uart_num, gpio_num_t gpio_irq, iFingerprintActionHandler *handler, nvs_handle_t nvsFingerName2FingerIndex, nvs_handle_t nvsFingerIndex2Timetable, nvs_handle_t nvsFingerIndex2Action, uint32_t targetAddress = DEFAULT_ADDRESS) : R503Pro(uart_num, gpio_irq, this), handler(handler), nvsFingerName2FingerIndex(nvsFingerName2FingerIndex), nvsFingerIndex2Timetable(nvsFingerIndex2Timetable), nvsFingerIndex2Action(nvsFingerIndex2Action) {}
+        M(uart_port_t uart_num, gpio_num_t gpio_irq, iFingerprintActionHandler *handler, iScheduler *scheduler, nvs_handle_t nvsFingerName2FingerIndex, nvs_handle_t nvsFingerIndex2Scheduler, nvs_handle_t nvsFingerIndex2Action, uint32_t targetAddress = DEFAULT_ADDRESS) : R503Pro(uart_num, gpio_irq, this), handler(handler), scheduler(scheduler), nvsFingerName2FingerIndex(nvsFingerName2FingerIndex), nvsFingerIndex2Scheduler(nvsFingerIndex2Scheduler), nvsFingerIndex2Action(nvsFingerIndex2Action) {}
 
         void HandleFingerprintDetected(uint8_t errorCode, uint16_t fingerIndex, uint16_t score)
         {
@@ -41,20 +41,19 @@ namespace FINGERPRINT
             if (errorCode != 0)
                 return;
             
-            char fingerIndexAsString[6];
-            snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
-            uint16_t actionIndex{0};
-            uint16_t timetableIndex{0};
+
             if (handler)
             {
+                char fingerIndexAsString[6];
+                snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
+                uint16_t actionIndex{0};
+                char schedulerName[NVS_KEY_NAME_MAX_SIZE];
+                schedulerName[NVS_KEY_NAME_MAX_SIZE-1]=0;
                 nvs_get_u16(this->nvsFingerIndex2Action, fingerIndexAsString, &actionIndex);
-                nvs_get_u16(this->nvsFingerIndex2Timetable, fingerIndexAsString, &timetableIndex);
-                ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d, timetableIndex=%d actionIndex=%d", fingerIndex, timetableIndex, actionIndex);
-                if (timetableIndex >= TIMER.size()){
-                    ESP_LOGW(TAG, "timetableIndex out of range");
-                    return;
-                }
-                if (TIMER[timetableIndex]->IsActive()){
+                size_t schedulerNameLen{0};
+                nvs_get_str(this->nvsFingerIndex2Scheduler, fingerIndexAsString, schedulerName, &schedulerNameLen);
+                ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d, schedulerName=%s actionIndex=%d", fingerIndex, schedulerName, actionIndex);
+                if (scheduler->GetCurrentValueOfSchedule(schedulerName)>0){
                     handler->HandleFingerprintAction(fingerIndex, actionIndex);
                 }
             }
@@ -72,8 +71,8 @@ namespace FINGERPRINT
                 ESP_ERROR_CHECK(nvs_commit(this->nvsFingerName2FingerIndex));
                 ESP_ERROR_CHECK(nvs_set_u16(this->nvsFingerIndex2Action, fingerIndexAsString, 0));
                 ESP_ERROR_CHECK(nvs_commit(this->nvsFingerIndex2Action));
-                ESP_ERROR_CHECK(nvs_set_u16(this->nvsFingerIndex2Timetable, fingerIndexAsString, 0));
-                ESP_ERROR_CHECK(nvs_commit(this->nvsFingerIndex2Timetable));
+                ESP_ERROR_CHECK(nvs_set_str(this->nvsFingerIndex2Scheduler, fingerIndexAsString, ""));
+                ESP_ERROR_CHECK(nvs_commit(this->nvsFingerIndex2Scheduler));
 
                 if (err != ESP_OK)
                 {
@@ -180,8 +179,8 @@ namespace FINGERPRINT
             nvs_erase_key(this->nvsFingerIndex2Action, fingerIndexAsString);
             RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Action), RET::xNVS_NOT_AVAILABLE);
 
-            nvs_erase_key(this->nvsFingerIndex2Timetable, fingerIndexAsString);
-            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Timetable), RET::xNVS_NOT_AVAILABLE);
+            nvs_erase_key(this->nvsFingerIndex2Scheduler, fingerIndexAsString);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Scheduler), RET::xNVS_NOT_AVAILABLE);
             return RET::OK;
         }
 
@@ -201,8 +200,8 @@ namespace FINGERPRINT
             RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsFingerIndex2Action), RET::xNVS_NOT_AVAILABLE);
             RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Action), RET::xNVS_NOT_AVAILABLE);
 
-            RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsFingerIndex2Timetable), RET::xNVS_NOT_AVAILABLE);
-            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Timetable), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_erase_all(this->nvsFingerIndex2Scheduler), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Scheduler), RET::xNVS_NOT_AVAILABLE);
             ESP_LOGI(TAG, "Successfully deleted all Fingerprints on the sensor hardware and in flash");
             return RET::OK;
         }
@@ -217,13 +216,13 @@ namespace FINGERPRINT
             return RET::OK;
         }
 
-        RET TryStoreFingerTimetable(uint16_t fingerIndex, uint16_t timetableIndex)
+        RET TryStoreFingerScheduler(uint16_t fingerIndex, const char* schedulerName)
         {
             char fingerIndexAsString[6];
             snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
-            RETURN_ERRORCODE_ON_ERROR(nvs_set_u16(this->nvsFingerIndex2Timetable, fingerIndexAsString, timetableIndex), RET::xNVS_NOT_AVAILABLE);
-            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Timetable), RET::xNVS_NOT_AVAILABLE);
-            ESP_LOGI(TAG, "Successfully stored finger timetable. index=%d timetable=%d", fingerIndex, timetableIndex);
+            RETURN_ERRORCODE_ON_ERROR(nvs_set_str(this->nvsFingerIndex2Scheduler, fingerIndexAsString, schedulerName), RET::xNVS_NOT_AVAILABLE);
+            RETURN_ERRORCODE_ON_ERROR(nvs_commit(this->nvsFingerIndex2Scheduler), RET::xNVS_NOT_AVAILABLE);
+            ESP_LOGI(TAG, "Successfully stored finger scheduler. index=%d scheduler=%s", fingerIndex, schedulerName);
             return RET::OK;
         }
     };

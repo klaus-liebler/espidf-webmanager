@@ -40,7 +40,7 @@ union Responses{
     ResponseTimeseriesDummy,
 //fingerprint start
     ResponseStoreFingerAction,
-    ResponseStoreFingerTimetable,
+    ResponseStoreFingerSchedule,
     ResponseOpenDoor,
     ResponseEnrollNewFinger,
     NotifyEnrollNewFinger,
@@ -70,7 +70,7 @@ union Requests{
     RequestTimeseries,
 //fingerprint start
     RequestStoreFingerAction,
-    RequestStoreFingerTimetable,
+    RequestStoreFingerSchedule,
     RequestOpenDoor,
     RequestEnrollNewFinger,
     RequestDeleteFinger,

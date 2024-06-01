@@ -27,6 +27,11 @@ enum eSchedule:byte{
     SunRandom,
 }
 
+table Schedule{
+    name:string;
+    schedule:uSchedule;
+}
+
 table ResponseSchedulerListItem{
     name:string;
     type: eSchedule;
@@ -46,13 +51,11 @@ table RequestSchedulerOpen{
 }
 
 table ResponseSchedulerOpen{
-    name:string;
-    schedule:uSchedule;
+    payload:Schedule;
 }
 
 table RequestSchedulerSave{
-    name:string;
-    schedule:uSchedule;
+    payload:Schedule;
 }
 
 table ResponseSchedulerSave{
