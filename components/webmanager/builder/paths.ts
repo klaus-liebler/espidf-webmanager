@@ -48,5 +48,6 @@ export const HOSTNAME_FILE = path.join(CERTIFICATES, "esp32_hostname.txt");
 
 
 //Location of esp idf tools
-export const NVS_PART_GEN_TOOL=path.join(IDF_PATH, "components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py");
-export const NVS_PART_TOOL=path.join(IDF_PATH, "components/partition_table/parttool.py");
+export const NVS_PARTITION_GEN_TOOL=path.join(IDF_PATH, "components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py");
+export const PART_TOOL=path.join(IDF_PATH, "components/partition_table/parttool.py");
+export const NVS_TOOL=path.join(IDF_PATH, "components/nvs_flash/nvs_partition_tool/nvs_tool.py");

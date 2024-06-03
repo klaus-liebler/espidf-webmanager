@@ -96,6 +96,8 @@ namespace webmanager
             return seconds_epoch > 1684412222; // epoch time when this code has been written
         }
 
+        
+
         void connectAsSTA()
         {
             ESP_LOGI(TAG, "Trying to connect as station. ssid='%s', password='%s'.", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password);
@@ -359,7 +361,7 @@ namespace webmanager
             case IP_EVENT_STA_GOT_IP:
             {
                 ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-                ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP: ip=" IPSTR " netmask=" IPSTR " gw=" IPSTR, IP2STR(&event->ip_info.ip), IP2STR(&event->ip_info.netmask), IP2STR(&event->ip_info.gw));
+                ESP_LOGI(TAG, "Got IP from DHCP: ip=" IPSTR " netmask=" IPSTR " gw=" IPSTR " hostname=%s", IP2STR(&event->ip_info.ip), IP2STR(&event->ip_info.netmask), IP2STR(&event->ip_info.gw), hostname);
                 staState = WifiStationState::CONNECTED;
                 update_sta_config_lazy();
                 xSemaphoreTake(webmanager_semaphore, portMAX_DELAY);
@@ -402,7 +404,7 @@ namespace webmanager
             assert(a->buffer);
             assert(a->buffer_len);
             assert(myself);
-            if(myself->http_server!=nullptr && myself->websocket_file_descriptor!=-1){
+            if(myself->http_server && myself->websocket_file_descriptor!=-1){
                 httpd_ws_frame_t ws_pkt={false, false, HTTPD_WS_TYPE_BINARY, a->buffer, a->buffer_len};
                 httpd_ws_send_frame_async(myself->http_server, myself->websocket_file_descriptor, &ws_pkt);
                 //printf("httpd_ws_send_frame_async: http:%lu fd:%i data_len:%u\n", (uint32_t)myself->http_server, myself->websocket_file_descriptor, a->buffer_len);
@@ -744,6 +746,10 @@ namespace webmanager
             return singleton;
         }
 
+        const char* GetHostname(){
+            return this->hostname;
+        }
+
         UserSettings* GetUserSettings(){
             return this->userSettings;
         }
@@ -792,7 +798,7 @@ namespace webmanager
             this->http_server=httpd_handle;
         }
 
-        esp_err_t Init(const char *accessPointSsid, const char *accessPointPassword, const char *hostnamePattern, bool resetStoredWifiConnection, bool init_netif_and_create_event_loop = true)
+        esp_err_t Begin(const char *accessPointSsid, const char *accessPointPassword, const char *hostnamePattern, bool resetStoredWifiConnection, bool init_netif_and_create_event_loop = true)
         {
             if (strlen(accessPointPassword) < 8 && AP_AUTHMODE != WIFI_AUTH_OPEN)
             {
@@ -893,7 +899,6 @@ namespace webmanager
 
             ESP_ERROR_CHECK(mdns_init());
             ESP_ERROR_CHECK(mdns_hostname_set(hostname));
-            ESP_LOGI(TAG, "mdns hostname set to '%s'", hostname);
             const char* MDNS_INSTANCE="SENSACT_MDNS_INSTANCE";
             ESP_ERROR_CHECK(mdns_instance_name_set(MDNS_INSTANCE));
 

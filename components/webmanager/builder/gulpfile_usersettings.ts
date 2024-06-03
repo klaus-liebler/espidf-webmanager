@@ -6,7 +6,7 @@ import gulp from "gulp";
 import path from "path";
 import { EscapeToVariableName } from "../usersettings/typescript/utils/usersettings_base";
 import { MyCodeBuilderImpl, writeFileCreateDirLazy } from "./gulpfile_utils";
-import { GENERATED_USERSETTINGS, NVS_PART_GEN_TOOL, USERSETTINGS_PATH, DEST_USERSETTINGS_PATH, NVS_PART_TOOL } from "./paths";
+import { GENERATED_USERSETTINGS, NVS_PARTITION_GEN_TOOL, USERSETTINGS_PATH, DEST_USERSETTINGS_PATH, PART_TOOL } from "./paths";
 import UserSettings from "../usersettings/go_here/go_here/usersettings"
 import fs from "node:fs";
 import { COM_PORT, USERSETTINGS_PARTITION_NAME, USERSETTINGS_PARTITION_SIZE_KILOBYTES } from "./gulpfile_config";
@@ -55,7 +55,7 @@ export function usersettings_generate_cpp_code(cb: gulp.TaskFunctionCallback) {
 }
 
 export function usersettings_createPartition(cb:gulp.TaskFunctionCallback){
-  proc.exec(`py "${NVS_PART_GEN_TOOL}" generate "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.csv")}" "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.bin")}" ${USERSETTINGS_PARTITION_SIZE_KILOBYTES*1024}`, (err, stdout, stderr) => {
+  proc.exec(`py "${NVS_PARTITION_GEN_TOOL}" generate "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.csv")}" "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.bin")}" ${USERSETTINGS_PARTITION_SIZE_KILOBYTES*1024}`, (err, stdout, stderr) => {
     console.log(stdout);
     cb(err);
   });
@@ -69,7 +69,8 @@ export function usersettings_distribute_ts(cb: gulp.TaskFunctionCallback) {
 }
 
 export function flashusersettings (cb: gulp.TaskFunctionCallback){
-  proc.exec(`py ${NVS_PART_TOOL} --port "${COM_PORT}" write_partition --partition-name=${USERSETTINGS_PARTITION_NAME} --input "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.bin")}"`, (err, stdout, stderr) => {
+  proc.exec(`py ${PART_TOOL} --port "${COM_PORT}" write_partition --partition-name=${USERSETTINGS_PARTITION_NAME} --input "${path.join(GENERATED_USERSETTINGS, "usersettings_partition.bin")}"`, (err, stdout, stderr) => {
+    console.log(stdout);
     cb(err);
   });
 }

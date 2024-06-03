@@ -36,13 +36,13 @@ const MAX_MESSAGE_COUNT = 20;
 
 function AddScreenControllers(app: AppController): void {
   //app.AddScreenController("dashboard", new RegExp("^/$"), html`<span>&#127760;</span><span>Home</span>`, DefaultScreenController)
-  app.AddScreenController("can", new RegExp("^/can$"), html`<span>&#127760;</span><span>Can Monitor</span>`, CanMonitorScreenController)
-  app.AddScreenController("system", new RegExp("^/system$"), html`<span>⌘</span><span>System Settings</span>`, SystemScreenController)
-  app.AddScreenController("properties", new RegExp("^/properties$"), html`<span>⚙</span><span>Properties</span>`, UsersettingsController)
+  app.AddScreenController("can", new RegExp("^/can$"), html`<span>🥽</span><span>Can Monitor</span>`, CanMonitorScreenController)
+  app.AddScreenController("system", new RegExp("^/system$"), html`<span>🧰</span><span>System Settings</span>`, SystemScreenController)
+  app.AddScreenController("properties", new RegExp("^/properties$"), html`<span>⌘</span><span>Properties</span>`, UsersettingsController)
   app.AddScreenController("wifiman", new RegExp("^/wifiman$"), html`<span>📶</span><span>Wifi Manager</span>`, WifimanagerScreenController)
   //app.AddScreenController("timeseries", /^\/timeseries(?:\/(?<id>\w*))?(?:\/(?<val>\d*))?$/, html`<span>📶</span><span>Timeseries</span>`, TimeseriesController)
   app.AddScreenController("finger", new RegExp("^/finger$"), html`<span>👉</span><span>Fingerprint</span>`, FingerprintScreenController)
-  app.AddScreenController("schedule", new RegExp("^/schedule$"), html`<span>👉</span><span>Scheduler</span>`, SchedulerScreenController)
+  app.AddScreenController("schedule", new RegExp("^/schedule$"), html`<span>📅</span><span>Scheduler</span>`, SchedulerScreenController)
 }
 
 class BufferedMessage {

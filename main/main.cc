@@ -27,9 +27,9 @@
 
 #define TAG "MAIN"
 #define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
-#define NVS_FINGER_NAMESPACE "finger"
-#define NVS_FINGER_ACTION_NAMESPACE "finger_act"
-#define NVS_FINGER_SCHEDULER_NAMESPACE "finger_sched"
+#define NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE "finger"
+#define NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE "finger_act"
+#define NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE "finger_sched"
 #define NVS_SCHEDULER_NAMESPACE "scheduler"
 
 FINGERPRINT::M *fpm{nullptr};
@@ -97,9 +97,9 @@ class Webmanager2Fingerprint2Hardware : public iMessageReceiver, public FINGERPR
 private:
     MessageSender *callback{nullptr};
 
-    nvs_handle_t nvsFingerHandle;
-    nvs_handle_t nvsFingerSchedulerHandle;
-    nvs_handle_t nvsFingerActionHandle;
+    nvs_handle_t nvsFingerName2FingerIndex;
+    nvs_handle_t nvsFingerIndex2SchedulerName;
+    nvs_handle_t nvsFingerIndex2ActionIndex;
     time_t fingerDetected{-1000000};
     static void static_task(void *args) { static_cast<Webmanager2Fingerprint2Hardware *>(args)->task(); }
     void task()
@@ -119,9 +119,9 @@ private:
     }
 
 public:
-    Webmanager2Fingerprint2Hardware(nvs_handle_t nvsFingerHandle, nvs_handle_t nvsFingerSchedulerHandle, nvs_handle_t nvsFingerActionHandle) : nvsFingerHandle(nvsFingerHandle), nvsFingerSchedulerHandle(nvsFingerSchedulerHandle),nvsFingerActionHandle(nvsFingerActionHandle)  {}
+    Webmanager2Fingerprint2Hardware(nvs_handle_t nvsFingerName2FingerIndex, nvs_handle_t nvsFingerIndex2SchedulerName, nvs_handle_t nvsFingerIndex2ActionIndex) : nvsFingerName2FingerIndex(nvsFingerName2FingerIndex), nvsFingerIndex2SchedulerName(nvsFingerIndex2SchedulerName),nvsFingerIndex2ActionIndex(nvsFingerIndex2ActionIndex)  {}
 
-    void begin()
+    void Begin()
     {
         gpio_set_level(PIN_MOTOR, 0);
         gpio_set_direction(PIN_MOTOR, GPIO_MODE_OUTPUT);
@@ -245,27 +245,52 @@ public:
                                                            .Union());
             break;
         }
+        case webmanager::Requests::Requests_RequestStoreFingerAction:
+        {
+            fpm->TryStoreFingerAction(mw->request_as_RequestStoreFingerAction()->fingerIndex(), mw->request_as_RequestStoreFingerAction()->actionIndex());
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerAction,
+                                                       webmanager::CreateResponseStoreFingerAction(b).Union());
+        }
 
+        case webmanager::Requests::Requests_RequestStoreFingerSchedule:
+        {
+            fpm->TryStoreFingerScheduler(mw->request_as_RequestStoreFingerSchedule()->fingerIndex(), mw->request_as_RequestStoreFingerSchedule()->scheduleName()->c_str());
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerSchedule,
+                                                       webmanager::CreateResponseStoreFingerSchedule(b).Union());
+        }
         case webmanager::Requests::Requests_RequestFingers:
         {
             std::vector<flatbuffers::Offset<flatbuffers::String>> scheduleNames;
             sched->FillFlatbufferWithAvailableNames(b, scheduleNames);
             
-            nvs_iterator_t it{nullptr};
-            esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_TYPE_U16, &it);
             std::vector<flatbuffers::Offset<webmanager::Finger>> fingers_vector;
+            
+            nvs_iterator_t it{nullptr};
+            esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE, NVS_TYPE_U16, &it);
             while (res == ESP_OK)
             {
                 nvs_entry_info_t info;
                 nvs_entry_info(it, &info); // Can omit error check if parameters are guaranteed to be non-NULL
-                uint16_t index;
-                char scheduleName[NVS_KEY_NAME_MAX_SIZE];
-                size_t scheduleNameLen{0};
+                uint16_t fingerIndex;
+                ESP_ERROR_CHECK(nvs_get_u16(nvsFingerName2FingerIndex, info.key, &fingerIndex));
+                char fingerIndexAsString[6];
+                snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
+
                 uint16_t actionIndex=0;
-                ESP_ERROR_CHECK(nvs_get_u16(nvsFingerHandle, info.key, &index));
-                nvs_get_str(nvsFingerSchedulerHandle, info.key, scheduleName, &scheduleNameLen);
-                nvs_get_u16(nvsFingerActionHandle, info.key, &actionIndex);
-                fingers_vector.push_back(webmanager::CreateFingerDirect(b, info.key, index, scheduleName, actionIndex));
+                if(nvs_get_u16(nvsFingerIndex2ActionIndex, fingerIndexAsString, &actionIndex)!=ESP_OK){
+                    ESP_LOGW(TAG, "Problem while fetching actionIndex for fingerIndex %s (%s). Assuming action 0", fingerIndexAsString, info.key);
+                    actionIndex=0;
+                }
+                
+                size_t scheduleNameLen{0};
+                nvs_get_str(nvsFingerIndex2SchedulerName, fingerIndexAsString, nullptr, &scheduleNameLen);
+                char scheduleName[scheduleNameLen];//scheduleNameLen+1 is NOT necessary!
+                auto err = nvs_get_str(nvsFingerIndex2SchedulerName, fingerIndexAsString, scheduleName, &scheduleNameLen);
+                if(err!=ESP_OK){
+                    ESP_LOGW(TAG, "Problem while fetching scheduleName for fingerIndex %s (%s). Error=%s. Assuming empty string.", fingerIndexAsString, info.key, esp_err_to_name(err));
+                    scheduleName[0]=0;
+                }
+                fingers_vector.push_back(webmanager::CreateFingerDirect(b, info.key, fingerIndex, scheduleName, actionIndex));
                 res = nvs_entry_next(&it);
             }
             nvs_release_iterator(it);
@@ -280,19 +305,7 @@ public:
                                                        webmanager::CreateResponseOpenDoor(b).Union());
         }
 
-        case webmanager::Requests::Requests_RequestStoreFingerAction:
-        {
-            fpm->TryStoreFingerAction(mw->request_as_RequestStoreFingerAction()->fingerIndex(), mw->request_as_RequestStoreFingerAction()->actionIndex());
-            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerAction,
-                                                       webmanager::CreateResponseStoreFingerAction(b).Union());
-        }
-
-        case webmanager::Requests::Requests_RequestStoreFingerSchedule:
-        {
-            fpm->TryStoreFingerScheduler(mw->request_as_RequestStoreFingerSchedule()->fingerIndex(), mw->request_as_RequestStoreFingerSchedule()->scheduleName()->c_str());
-            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerSchedule,
-                                                       webmanager::CreateResponseStoreFingerSchedule(b).Union());
-        }
+        
         default:
             return ESP_FAIL;
         }
@@ -324,38 +337,50 @@ extern "C" void app_main(void)
 
     // timeseries::M* tsman=timeseries::M::GetSingleton();
     // tsman->Init(&zahl1, &zahl1, &zahl2, &zahl3);
-    nvs_handle_t nvsFingerHandle;
-    nvs_handle_t nvsFingerSchedulerHandle;
-    nvs_handle_t nvsFingerActionHandle;
-    nvs_handle_t nvsSchedulerHandle;
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsFingerHandle));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsFingerSchedulerHandle));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_ACTION_NAMESPACE, NVS_READWRITE, &nvsFingerActionHandle));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerHandle));
+    nvs_handle_t nvsFingerName2FingerIndex;
+    nvs_handle_t nvsFingerIndex2SchedulerName;
+    nvs_handle_t nvsFingerIndex2ActionIndex;
+    nvs_handle_t nvsSchedulerName2SchedulerObjHandle;
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerName2FingerIndex));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2SchedulerName));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2ActionIndex));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerName2SchedulerObjHandle));
+
+    nvs_iterator_t it{nullptr};
+    esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_TYPE_ANY, &it);
+    while (res == ESP_OK)
+    {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info); // Can omit error check if parameters are guaranteed to be non-NULL
+        ESP_LOGI(TAG, "In NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE found key '%s' with type %i", info.key, info.type);
+        res = nvs_entry_next(&it);
+    }
+    nvs_release_iterator(it);
+
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
     led = new LED::M(PIN_LED, true);
     led->Begin();
 
-    sched = new SCHEDULER::Scheduler(nvsSchedulerHandle);
-    Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerHandle, nvsFingerSchedulerHandle, nvsFingerActionHandle);
-    w2f->begin();
+    sched = new SCHEDULER::Scheduler(nvsSchedulerName2SchedulerObjHandle);
+    sched->Begin();
+    Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerName2FingerIndex, nvsFingerIndex2SchedulerName, nvsFingerIndex2ActionIndex);
+    w2f->Begin();
 
 
-    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, sched, nvsFingerHandle, nvsFingerSchedulerHandle, nvsFingerActionHandle);
-    fpm->begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);
+    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, sched, nvsFingerName2FingerIndex, nvsFingerIndex2SchedulerName, nvsFingerIndex2ActionIndex);
+    fpm->Begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);
 
     canmonitor = new CANMONITOR::M(w2f);
-    canmonitor->begin(&t_config, &g_config);
+    canmonitor->Begin(&t_config, &g_config);
 
     webmanager::M *wman = webmanager::M::GetSingleton();
-    ESP_ERROR_CHECK(wman->Init("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
-
+    ESP_ERROR_CHECK(wman->Begin("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
+    esp_log_level_set("esp_https_server", ESP_LOG_WARN);
     ESP_ERROR_CHECK(httpd_ssl_start(&http_server, &conf));
-    ESP_LOGI(TAG, "HTTPD with SSL started");
+    ESP_LOGI(TAG, "HTTPS Server listening on https://%s:%d", wman->GetSingleton()->GetHostname(), conf.port_secure);
     wman->RegisterHTTPDHandlers(http_server);
-    ESP_LOGI(TAG, "HTTPD handlers registered");
     std::vector<iMessageReceiver*>plugins{w2f, sched};
     wman->SetPlugins(&plugins);
     ESP_LOGI(TAG, "Webmanager plugins registered");

@@ -63,7 +63,7 @@ namespace CANMONITOR
     public:
         M(iCanmonitorHandler* handler) :handler(handler) {}
         
-        void begin(const twai_timing_config_t* t_config, const twai_general_config_t* g_config)
+        void Begin(const twai_timing_config_t* t_config, const twai_general_config_t* g_config)
         {
             //Install and start TWAI driver
             ESP_ERROR_CHECK(twai_driver_install(g_config, t_config, &f_config));

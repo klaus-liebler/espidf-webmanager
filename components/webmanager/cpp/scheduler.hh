@@ -51,7 +51,6 @@ namespace SCHEDULER
             {
                 nvs_entry_info_t info;
                 nvs_entry_info(it, &info); // Can omit error check if parameters are guaranteed to be non-NULL
-                printf("key '%s', type '%d' ", info.key, info.type);
                 size_t length{0};
                 nvs_get_blob(this->nvsSchedulerHandle, info.key, nullptr, &length);
                 uint8_t data[length];
@@ -94,7 +93,7 @@ namespace SCHEDULER
                     o->CreateFlatbufferScheduleOffset(b).Union()).Union());
         }
 
-        void FillFlatbufferWithAvailableNames(flatbuffers::FlatBufferBuilder &b, std::vector<flatbuffers::Offset<flatbuffers::String>> vect) override{
+        void FillFlatbufferWithAvailableNames(flatbuffers::FlatBufferBuilder &b, std::vector<flatbuffers::Offset<flatbuffers::String>> &vect) override{
             for (auto const &[key, val] : name2timer)
             {
                 vect.push_back(b.CreateString(key));

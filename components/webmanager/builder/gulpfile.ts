@@ -94,6 +94,14 @@ exports.build = gulp.series(
     cb();
   }
 
+  exports.show_nvs =(cb: gulp.TaskFunctionCallback)=>{
+    proc.exec(`py "${P.NVS_TOOL}" --port "${COM_PORT}"`, (err, stdout, stderr) => {
+      console.log(stdout);
+      cb(err);
+    });
+  }
+
+
   exports.flashusersettings = flashusersettings;
   
 

@@ -67,6 +67,14 @@ enum RET {
     xNAME_IS_NULL = 0x10C,
 };
 
+const index2action=[
+    "Open Door Side",
+    "Open Door Front",
+    "Open Garage",
+    "Alarm Silent",
+    "Play MissionImpossible"
+];
+
 export class FingerprintScreenController extends ScreenController {
 
 
@@ -179,28 +187,27 @@ export class FingerprintScreenController extends ScreenController {
         this.scheduleNames.forEach(scheduleName => {
             timeSelect.options.add(new Option(scheduleName, scheduleName, fingersScheduleName==scheduleName, fingersScheduleName==scheduleName));
         });
-        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Save`])).onclick = () => {
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `✔Save`])).onclick = () => {
             this.sendRequestStoreFingerTimetable(f.index()!, timeSelect.value);
         };
 
 
         cell = row.insertCell();
         var actionSelect = (<HTMLSelectElement>Html(cell, "select"));
-        actionSelect.options.add(new Option("Open Door Side", "0", true));
-        actionSelect.options.add(new Option("Open Door Front"));
-        actionSelect.options.add(new Option("Open Garage"));
-        actionSelect.options.add(new Option("Alarm Silent"));
-        actionSelect.options.add(new Option("Play MissionImpossible"));
-        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Save`])).onclick = () => {
+        var fingersActionIndex = f.actionIndex()
+        index2action.forEach((a,i) => {
+            actionSelect.options.add(new Option(a, a, i==fingersActionIndex, i==fingersActionIndex));
+        });
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `✔Save`])).onclick = () => {
             this.sendRequestStoreFingerAction(f.index()!, actionSelect.selectedIndex);
         };
 
 
         cell = row.insertCell();
-        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Delete`])).onclick = () => {
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `❌Delete`])).onclick = () => {
             this.sendRequestDeleteFinger(f!.name()!);
         };
-        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Rename`])).onclick = () => {
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `✎Rename`])).onclick = () => {
             this.appManagement.showEnterFilenameDialog("Enter new finger name", (ok, value) => {
                 if (!ok) return;
                 this.sendRequestRenameFinger(f!.index(), f!.name()!, value);
