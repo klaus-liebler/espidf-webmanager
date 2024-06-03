@@ -7,10 +7,11 @@ import { PartitionInfo } from "./generated/flatbuffers/webmanager/partition-info
 import { Mac6, } from "./generated/flatbuffers/webmanager/mac6";
 import { NotifyLiveLogItem } from "./generated/flatbuffers/webmanager/notify-live-log-item";
 import { AccessPoint } from "./generated/flatbuffers/webmanager/access-point";
-import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, NotifyEnrollNewFinger, RequestEnrollNewFinger, RequestGetUserSettings, RequestSetUserSettings, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity, Uint8x32 } from "./generated/flatbuffers/webmanager";
-import { processScheduler_RequestScheduler } from "./helper/schedule_generator"
-import { createTimeseries } from "./helper/timeseries_generator"
+import { BooleanSetting, EnumSetting, Finger, IntegerSetting, JournalItem, NotifyEnrollNewFinger, RequestEnrollNewFinger, RequestGetUserSettings, RequestSetUserSettings, RequestStoreFingerAction, RequestStoreFingerSchedule, RequestTimeseries, RequestWifiConnect, RequestWrapper, Requests, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseGetUserSettings, ResponseJournal, ResponseNetworkInformation, ResponseSetUserSettings, ResponseWifiConnectFailed, ResponseWifiConnectSuccessful, ResponseWrapper, Responses, Setting, SettingWrapper, StringSetting, TimeGranularity, Uint8x32 } from "./generated/flatbuffers/webmanager";
+import { exampleSchedules, processScheduler_RequestScheduler } from "./screens/scheduler"
+import { createTimeseries } from "./screens/timeseries"
 import { RequestScheduler } from "./generated/flatbuffers/scheduler/request-scheduler";
+import { processRequestStoreFingerAction, processRequestStoreFingerSchedule, sendResponseEnrollNewFinger, sendResponseFingerprintSensorInfo, sendResponseFingers } from "./screens/fingerprint"
 
 
 const PORT = 3000;
@@ -18,91 +19,6 @@ const BUNDLED_FILE = "../dist_webui/compressed/app.html.br";
 
 const wss = new WebSocketServer({ noServer: true });
 
-function sendResponseSystemData(ws: WebSocket) {
-    let b = new flatbuffers.Builder(1024);
-    let piOffset0 = PartitionInfo.createPartitionInfo(b, b.createString("Label0"), 0, 0x10, 3072, 1, true, b.createString("AppName"), b.createString("AppVersion"), b.createString("AppDate"), b.createString("AppTime"));
-    let piOffset1 = PartitionInfo.createPartitionInfo(b, b.createString("Label1"), 1, 0x01, 16384, 1, true, b.createString("AppName"), b.createString("AppVersion"), b.createString("AppDate"), b.createString("AppTime"));
-
-    let piVecOffset = ResponseSystemData.createPartitionsVector(b, [piOffset0, piOffset1]);
-    ResponseSystemData.startResponseSystemData(b);
-    ResponseSystemData.addChipCores(b, 2);
-    ResponseSystemData.addChipFeatures(b, 255);
-    ResponseSystemData.addPartitions(b, piVecOffset);
-    ResponseSystemData.addChipModel(b, 2);
-    ResponseSystemData.addChipRevision(b, 3);
-    ResponseSystemData.addChipTemperature(b, 23.4);
-    ResponseSystemData.addFreeHeap(b, 1203);
-    ResponseSystemData.addMacAddressBt(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
-    ResponseSystemData.addMacAddressEth(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
-    ResponseSystemData.addMacAddressIeee802154(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
-    ResponseSystemData.addMacAddressWifiSoftap(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
-    ResponseSystemData.addMacAddressWifiSta(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
-    ResponseSystemData.addSecondsEpoch(b, BigInt(Math.floor(new Date().getTime() / 1000)));
-    ResponseSystemData.addSecondsUptime(b, BigInt(10));
-    let rsd = ResponseSystemData.endResponseSystemData(b);
-    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseSystemData, rsd));
-    ws.send(b.asUint8Array());
-}
-
-function sendResponseFingerprintSensorInfo(ws: WebSocket) {
-    let b = new flatbuffers.Builder(1024);
-    var usedIndices =new Array(32).fill(0);
-    usedIndices[0]=0b10101010;
-    usedIndices[1]=0b01010101;
-    
-    var alg=b.createString("AlgVer1.1")
-    var fw=b.createString("FwVer1.2")
-    ResponseFingerprintSensorInfo.startResponseFingerprintSensorInfo(b);
-    ResponseFingerprintSensorInfo.addAlgVer(b, alg);
-    ResponseFingerprintSensorInfo.addFwVer(b, fw);
-    ResponseFingerprintSensorInfo.addBaudRateTimes9600(b, 6);
-    ResponseFingerprintSensorInfo.addDataPacketSizeCode(b, 2);
-    ResponseFingerprintSensorInfo.addDeviceAddress(b, 0xffff);
-    ResponseFingerprintSensorInfo.addLibrarySizeMax(b, 1500);
-    ResponseFingerprintSensorInfo.addLibrarySizeUsed(b, 2);
-    ResponseFingerprintSensorInfo.addLibraryUsedIndices(b, Uint8x32.createUint8x32(b, usedIndices));
-    ResponseFingerprintSensorInfo.addSecurityLevel(b, 3)
-    ResponseFingerprintSensorInfo.addStatus(b, 0);
-    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingerprintSensorInfo, ResponseFingerprintSensorInfo.endResponseFingerprintSensorInfo(b)));
-    ws.send(b.asUint8Array());
-}
-
-
-function sendResponseFingers(ws: WebSocket) {
-    let b = new flatbuffers.Builder(1024);
-    let fingersOffset = ResponseFingers.createFingersVector(b, [
-        Finger.createFinger(b, b.createString("Klaus rechts mitte"), 1, 0, 1),
-        Finger.createFinger(b, b.createString("Steffi links mitte"), 2, 5, 1)
-
-    ]);
-    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingers,
-        ResponseFingers.createResponseFingers(b, fingersOffset)
-        ));
-    ws.send(b.asUint8Array());
-}
-
-function sendNotifyEnrollNewFinger(ws:WebSocket, step:number, index:number, name:string, delay_ms:number){
-    
-    setTimeout(() => {
-        console.log(`sendNotifyEnrollNewFinger step=${step}, index=${index}, name=${name}`)
-        let b = new flatbuffers.Builder(1024);
-        b.finish(ResponseWrapper.createResponseWrapper(b, Responses.NotifyEnrollNewFinger, NotifyEnrollNewFinger.createNotifyEnrollNewFinger(b, b.createString(name), index, step, 0)));
-        ws.send(b.asUint8Array());
-    }, delay_ms);
-
-}
-
-
-function sendResponseEnrollNewFinger(ws:WebSocket, req:RequestEnrollNewFinger){
-    var fpName= req.name();
-    console.log(`sendResponseEnrollNewFinger name=${fpName}`)
-    let b = new flatbuffers.Builder(1024);
-    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseEnrollNewFinger, ResponseEnrollNewFinger.createResponseEnrollNewFinger(b, 0)));
-    ws.send(b.asUint8Array());
-    for(var step=0; step<16;step++){
-        sendNotifyEnrollNewFinger(ws, step, 42, fpName, step*500+2000);
-    }
-}
 
 const AP_GOOD="Connect to AP -50dB Auth=2";
 const AP_BAD="Connect to AP -100dB Auth=2";
@@ -205,6 +121,31 @@ function sendResponseTimeseries(ws: WebSocket, req:RequestTimeseries) {
     ws.send(createTimeseries(req.granularity()));
 }
 
+function sendResponseSystemData(ws: WebSocket) {
+    let b = new flatbuffers.Builder(1024);
+    let piOffset0 = PartitionInfo.createPartitionInfo(b, b.createString("Label0"), 0, 0x10, 3072, 1, true, b.createString("AppName"), b.createString("AppVersion"), b.createString("AppDate"), b.createString("AppTime"));
+    let piOffset1 = PartitionInfo.createPartitionInfo(b, b.createString("Label1"), 1, 0x01, 16384, 1, true, b.createString("AppName"), b.createString("AppVersion"), b.createString("AppDate"), b.createString("AppTime"));
+
+    let piVecOffset = ResponseSystemData.createPartitionsVector(b, [piOffset0, piOffset1]);
+    ResponseSystemData.startResponseSystemData(b);
+    ResponseSystemData.addChipCores(b, 2);
+    ResponseSystemData.addChipFeatures(b, 255);
+    ResponseSystemData.addPartitions(b, piVecOffset);
+    ResponseSystemData.addChipModel(b, 2);
+    ResponseSystemData.addChipRevision(b, 3);
+    ResponseSystemData.addChipTemperature(b, 23.4);
+    ResponseSystemData.addFreeHeap(b, 1203);
+    ResponseSystemData.addMacAddressBt(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
+    ResponseSystemData.addMacAddressEth(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
+    ResponseSystemData.addMacAddressIeee802154(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
+    ResponseSystemData.addMacAddressWifiSoftap(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
+    ResponseSystemData.addMacAddressWifiSta(b, Mac6.createMac6(b, [1, 2, 3, 4, 5, 6]));
+    ResponseSystemData.addSecondsEpoch(b, BigInt(Math.floor(new Date().getTime() / 1000)));
+    ResponseSystemData.addSecondsUptime(b, BigInt(10));
+    let rsd = ResponseSystemData.endResponseSystemData(b);
+    b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseSystemData, rsd));
+    ws.send(b.asUint8Array());
+}
 
 function process(buffer: Buffer, ws: WebSocket) {
     let data = new Uint8Array(buffer);
@@ -236,14 +177,21 @@ function process(buffer: Buffer, ws: WebSocket) {
             break;
         }
         case Requests.RequestFingerprintSensorInfo:
-            setTimeout(()=>sendResponseFingerprintSensorInfo(ws), 100);
+            sendResponseFingerprintSensorInfo(ws)
             break;
         case Requests.RequestFingers:
-            setTimeout(()=>sendResponseFingers(ws), 100);
+            sendResponseFingers(ws)
             break;
+        case Requests.RequestStoreFingerAction:
+            processRequestStoreFingerAction(ws, <RequestStoreFingerAction>mw.request(new RequestStoreFingerAction)); 
+            break;
+        case Requests.RequestStoreFingerSchedule:
+            processRequestStoreFingerSchedule(ws, <RequestStoreFingerSchedule>mw.request(new RequestStoreFingerSchedule)); 
+            break
         case Requests.RequestEnrollNewFinger:
             setTimeout(()=>sendResponseEnrollNewFinger(ws, <RequestEnrollNewFinger>mw.request(new RequestEnrollNewFinger())), 100);
-        case Requests.scheduler_RequestScheduler:
+        
+            case Requests.scheduler_RequestScheduler:
             setTimeout(()=>processScheduler_RequestScheduler(ws, <RequestScheduler>mw.request(new RequestScheduler())), 100);
             break;
         default:

@@ -86,11 +86,12 @@ table RequestFingers{}
 table Finger{
     name:string;
     index:uint16;
-    timetableIndex:uint16;
+    scheduleName:string;
     actionIndex:uint16;
 }
 
 table ResponseFingers{
+    scheduleNames:[string];
     fingers:[Finger];
 }
 

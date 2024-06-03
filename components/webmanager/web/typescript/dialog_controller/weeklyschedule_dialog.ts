@@ -5,10 +5,14 @@ import { DialogController } from "./dialog_controller";
 const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const startHour=6;
 enum MarkingMode{TOGGLE,ON,OFF};
+export interface iWeeklyScheduleDialogHandler{
+    handleWeeklyScheduleDialog(ok: boolean, referenceHandle:any, value: Uint8Array);
+}
+
 export class WeeklyScheduleDialog extends DialogController {
     
     
-    constructor(private header:string, private initialValue: Uint8Array|null, private pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, private referenceHandle:any){
+    constructor(private header:string, private initialValue: Uint8Array|null, private handler:iWeeklyScheduleDialogHandler, private referenceHandle:any){
         super()
     }
 
@@ -26,7 +30,6 @@ export class WeeklyScheduleDialog extends DialogController {
                         var shouldBeMarked=value & (0b10000000>>quarterhour)
                         this.setSelected(d, two_hours_interval*8+quarterhour, shouldBeMarked>0);
                     }
-                    
                 }
             }
         }else{
@@ -98,7 +101,7 @@ export class WeeklyScheduleDialog extends DialogController {
 
     protected cancelHandler() {
         this.dialog.value!.close('Cancel')
-        this.pHandler?.(false, this.referenceHandle, null);
+        this.handler.handleWeeklyScheduleDialog(false, this.referenceHandle, null);
     }
 
     protected okHandler() {
@@ -116,7 +119,7 @@ export class WeeklyScheduleDialog extends DialogController {
             }
         }
         this.dialog.value!.close("Ok");
-        this.pHandler?.(true, this.referenceHandle, arr);
+        this.handler.handleWeeklyScheduleDialog(true, this.referenceHandle, arr);
     }
 
     

@@ -1,5 +1,6 @@
 import type { ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { DialogController } from "../dialog_controller/dialog_controller";
+import { iWeeklyScheduleDialogHandler } from "../dialog_controller/weeklyschedule_dialog";
 import type { Severity } from "./common";
 
 export interface IWebsocketMessageListener {
@@ -21,7 +22,7 @@ export interface IAppManagement {
   showEnterPasswordDialog(messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
   showOKDialog(pSeverity: Severity, messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
   showOKCancelDialog(pSeverity: Severity, messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
-  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, referenceHandle:any):void;
+  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, handler:iWeeklyScheduleDialogHandler, referenceHandle:any):void;
   showDialog<T extends DialogController>(type: { new(m: IAppManagement, pHandler?: ((ok: boolean, value: any) => any)): T; } , pHandler?: ((ok: boolean, value: string) => any)): void;
 };
 

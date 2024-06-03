@@ -1,13 +1,17 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { Finger, NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerTimetable, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
+import { Finger, NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerSchedule, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import { Html, Severity } from "../utils/common";
-import { TemplateResult, html, svg } from "lit-html";
+import { html } from "lit-html";
+
+import square_plus from '../../svgs/solid/square-plus.svg?raw'
+import rotate from '../../svgs/solid/rotate.svg?raw'
+import trash from '../../svgs/solid/trash.svg?raw'
+import ban from '../../svgs/solid/ban.svg?raw'
+import door_open from '../../svgs/solid/door-open.svg?raw'
+import info from '../../svgs/solid/info.svg?raw'
 import { unsafeSVG } from "lit-html/directives/unsafe-svg.js";
-import bell from '../../svgs/regular/bell.svg?raw'
-import add from '../../svgs/regular/address-book.svg?raw'
-import cal from '../../svgs/regular/calendar-check.svg?raw'
 
 enum RET {
     OK = 0x00,                           //!< Command execution is complete
@@ -71,15 +75,15 @@ export class FingerprintScreenController extends ScreenController {
     private fingerIndex2tr = new Map<number, HTMLTableRowElement>();
     private fingerIndex2name = new Map<number, string>();
 
+    private scheduleNames:Array<string>=[]
+
     public Template = () => html`
-    <h1>Current Fingers </h1>${unsafeSVG(bell)}${unsafeSVG(add)}${unsafeSVG(cal)}
-        
+    <h1>Current Fingers </h1>
         <div class="buttons">
-        
-            <input @click=${() => this.btnUpdateFingers()} type="button" value="Update" />
-            <input @click=${() => this.btnFingerprintEnroll()} type="button" value="Enroll" />
-            <input @click=${() => this.btnDeleteAll()} type="button" value="Delete All" />
-            <input @click=${() => this.btnCancelInstruction()} type="button" value="Cancel Instruction" />
+            <button class="withsvg" @click=${() => this.btnUpdateFingers()}>${unsafeSVG(rotate)}<span>Update List<span></button>
+            <button class="withsvg" @click=${() => this.btnFingerprintEnroll()}>${unsafeSVG(square_plus)}<span>Enroll new Finger<span></button>
+            <button class="withsvg" @click=${() => this.btnDeleteAll()}>${unsafeSVG(trash)}<span>Delete All<span></button>
+            <button class="withsvg" @click=${() => this.btnCancelInstruction()}>${unsafeSVG(ban)}<span>Cancel Instruction<span></button>
         </div>
         <table>
             <thead>
@@ -97,8 +101,8 @@ export class FingerprintScreenController extends ScreenController {
         
         <h1>System</h1>
         <div class="buttons">
-            <input @click=${() => this.btnOpenDoor()} type="button" value="Open Door" />
-            <input @click=${() => this.btnFingerprintGetSensorInfo()} type="button" value="Get Sensor Info" />
+            <button class="withsvg" @click=${() => this.btnOpenDoor()}>${unsafeSVG(door_open)}<span>Open Door<span></button>
+            <button class="withsvg" @click=${() => this.btnFingerprintGetSensorInfo()}>${unsafeSVG(info)}<span>Get Sensor Info<span></button>
         </div>
         <table>
             <thead>
@@ -109,11 +113,6 @@ export class FingerprintScreenController extends ScreenController {
             </thead>
             <tbody ${ref(this.tblFingerprintSensorInfo)}></tbody>
         </table>`
-
-    //jede Tabellenzeile hat einen Button "Rename" und einen Button "Delete"
-    //im Property-Speicher des ESP32 wird abgelegt, welche Bezeichnung zu welcher internen Nummer gehört
-    //Das Anlegen eines Eintrages findet ausschließlich über die Automatische Nummerierung statt
-    //in der Tabelle wird auch die interne Speichernummer angezeigt
 
 
 
@@ -127,15 +126,15 @@ export class FingerprintScreenController extends ScreenController {
         this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseDeleteFinger]);
     }
 
-    private sendRequestStoreFingerTimetable(fingerIndex: number, timetableIndex: number) {
-        console.log(`sendRequestStoreFingerTimetable fingerIndex=${fingerIndex} timetableIndex=${timetableIndex}`)
+    private sendRequestStoreFingerTimetable(fingerIndex: number, scheduleName: string) {
+        console.log(`sendRequestStoreFingerTimetable fingerIndex=${fingerIndex} scheduleName=${scheduleName}`)
         let b = new flatbuffers.Builder(1024);
         b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerTimetable,
-                RequestStoreFingerTimetable.createRequestStoreFingerTimetable(b, fingerIndex, timetableIndex)
+            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerSchedule,
+                RequestStoreFingerSchedule.createRequestStoreFingerSchedule(b, fingerIndex, b.createString(scheduleName))
             )
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerTimetable]);
+        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerSchedule]);
     }
 
     private sendRequestStoreFingerAction(fingerIndex: number, actionIndex: number) {
@@ -176,14 +175,12 @@ export class FingerprintScreenController extends ScreenController {
         row.insertCell().textContent = String(f.index());
         var cell = row.insertCell();
         var timeSelect = (<HTMLSelectElement>Html(cell, "select"));
-        timeSelect.options.add(new Option("Always", "0", true));
-        timeSelect.options.add(new Option("Never"));
-        timeSelect.options.add(new Option("Daily 6-22"));
-        timeSelect.options.add(new Option("Working Days 7-18"));
-        timeSelect.options.add(new Option("Cleaning Service"));
-        timeSelect.options.add(new Option("Test Even Minutes On, Odd Minutes Off"));
+        var fingersScheduleName = f.scheduleName();
+        this.scheduleNames.forEach(scheduleName => {
+            timeSelect.options.add(new Option(scheduleName, scheduleName, fingersScheduleName==scheduleName, fingersScheduleName==scheduleName));
+        });
         (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Save`])).onclick = () => {
-            this.sendRequestStoreFingerTimetable(f.index()!, timeSelect.selectedIndex);
+            this.sendRequestStoreFingerTimetable(f.index()!, timeSelect.value);
         };
 
 
@@ -200,10 +197,10 @@ export class FingerprintScreenController extends ScreenController {
 
 
         cell = row.insertCell();
-        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `🗑`])).onclick = () => {
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Delete`])).onclick = () => {
             this.sendRequestDeleteFinger(f!.name()!);
         };
-        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `🗑`])).onclick = () => {
+        (<HTMLInputElement>Html(cell, "input", ["type", "button", "value", `Rename`])).onclick = () => {
             this.appManagement.showEnterFilenameDialog("Enter new finger name", (ok, value) => {
                 if (!ok) return;
                 this.sendRequestRenameFinger(f!.index(), f!.name()!, value);
@@ -248,11 +245,16 @@ export class FingerprintScreenController extends ScreenController {
                     this.tblFingers.value!.textContent = "";
                     this.fingerIndex2name.clear();
                     this.fingerIndex2tr.clear();
+                    this.scheduleNames=[];
+                    for (let i = 0; i < m.scheduleNamesLength(); i++) {
+                        this.scheduleNames.push(m.scheduleNames(i))
+                    }
                     for (let i = 0; i < m.fingersLength(); i++) {
                         var f = m.fingers(i);
                         if (!f) continue;
                         this.insertFinger(f)
                     }
+                   
                     break;
                 }
             case Responses.ResponseDeleteFinger: {

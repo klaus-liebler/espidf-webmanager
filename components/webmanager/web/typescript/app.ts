@@ -17,7 +17,7 @@ import { runCarRace } from "./screen_controller/racinggame_controller";
 import { FingerprintScreenController } from "./screen_controller/fingerprint_controller";
 import { SystemScreenController } from "./screen_controller/systemscreen_controller";
 import { UsersettingsController } from "./screen_controller/usersettings_controller";
-import { WeeklyScheduleDialog } from "./dialog_controller/weeklyschedule_dialog";
+import { WeeklyScheduleDialog, iWeeklyScheduleDialogHandler } from "./dialog_controller/weeklyschedule_dialog";
 import { SchedulerScreenController } from "./screen_controller/scheduler_controller";
 
 
@@ -87,8 +87,8 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     this.renderAndShowDialog(new OkCancelDialog(pSeverity, messageText, pHandler));
   }
 
-  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, pHandler: (ok: boolean, referenceHandle:any, value: Uint8Array) => any, referenceHandle:any):void{
-    this.renderAndShowDialog(new WeeklyScheduleDialog(heading, initialValue, pHandler, referenceHandle));
+  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, handler:iWeeklyScheduleDialogHandler, referenceHandle:any):void{
+    this.renderAndShowDialog(new WeeklyScheduleDialog(heading, initialValue, handler, referenceHandle));
   }
 
   showDialog<T extends DialogController>(type: T): void{

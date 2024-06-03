@@ -94,6 +94,13 @@ namespace SCHEDULER
                     o->CreateFlatbufferScheduleOffset(b).Union()).Union());
         }
 
+        void FillFlatbufferWithAvailableNames(flatbuffers::FlatBufferBuilder &b, std::vector<flatbuffers::Offset<flatbuffers::String>> vect) override{
+            for (auto const &[key, val] : name2timer)
+            {
+                vect.push_back(b.CreateString(key));
+            }
+        }
+
         esp_err_t handleRequest(flatbuffers::FlatBufferBuilder &b, const scheduler::RequestSchedulerList* req){
             std::vector<flatbuffers::Offset<scheduler::ResponseSchedulerListItem>> items;
             for (auto const &[key, val] : name2timer)

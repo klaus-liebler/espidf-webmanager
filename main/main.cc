@@ -29,10 +29,11 @@
 #define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
 #define NVS_FINGER_NAMESPACE "finger"
 #define NVS_FINGER_ACTION_NAMESPACE "finger_act"
-#define NVS_FINGER_TIMETABLE_NAMESPACE "finger_time"
+#define NVS_FINGER_SCHEDULER_NAMESPACE "finger_sched"
 #define NVS_SCHEDULER_NAMESPACE "scheduler"
 
 FINGERPRINT::M *fpm{nullptr};
+SCHEDULER::Scheduler *sched{nullptr};
 CANMONITOR::M *canmonitor{nullptr};
 BUZZER::M *buzzer{nullptr};
 LED::M *led{nullptr};
@@ -97,7 +98,7 @@ private:
     MessageSender *callback{nullptr};
 
     nvs_handle_t nvsFingerHandle;
-    nvs_handle_t nvsFingerTimetableHandle;
+    nvs_handle_t nvsFingerSchedulerHandle;
     nvs_handle_t nvsFingerActionHandle;
     time_t fingerDetected{-1000000};
     static void static_task(void *args) { static_cast<Webmanager2Fingerprint2Hardware *>(args)->task(); }
@@ -118,7 +119,7 @@ private:
     }
 
 public:
-    Webmanager2Fingerprint2Hardware(nvs_handle_t nvsFingerHandle, nvs_handle_t nvsFingerTimetableHandle, nvs_handle_t nvsFingerActionHandle) : nvsFingerHandle(nvsFingerHandle), nvsFingerTimetableHandle(nvsFingerTimetableHandle),nvsFingerActionHandle(nvsFingerActionHandle)  {}
+    Webmanager2Fingerprint2Hardware(nvs_handle_t nvsFingerHandle, nvs_handle_t nvsFingerSchedulerHandle, nvs_handle_t nvsFingerActionHandle) : nvsFingerHandle(nvsFingerHandle), nvsFingerSchedulerHandle(nvsFingerSchedulerHandle),nvsFingerActionHandle(nvsFingerActionHandle)  {}
 
     void begin()
     {
@@ -247,6 +248,9 @@ public:
 
         case webmanager::Requests::Requests_RequestFingers:
         {
+            std::vector<flatbuffers::Offset<flatbuffers::String>> scheduleNames;
+            sched->FillFlatbufferWithAvailableNames(b, scheduleNames);
+            
             nvs_iterator_t it{nullptr};
             esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_TYPE_U16, &it);
             std::vector<flatbuffers::Offset<webmanager::Finger>> fingers_vector;
@@ -255,17 +259,18 @@ public:
                 nvs_entry_info_t info;
                 nvs_entry_info(it, &info); // Can omit error check if parameters are guaranteed to be non-NULL
                 uint16_t index;
-                uint16_t timetableIndex=0;
+                char scheduleName[NVS_KEY_NAME_MAX_SIZE];
+                size_t scheduleNameLen{0};
                 uint16_t actionIndex=0;
                 ESP_ERROR_CHECK(nvs_get_u16(nvsFingerHandle, info.key, &index));
-                nvs_get_u16(nvsFingerTimetableHandle, info.key, &timetableIndex);
+                nvs_get_str(nvsFingerSchedulerHandle, info.key, scheduleName, &scheduleNameLen);
                 nvs_get_u16(nvsFingerActionHandle, info.key, &actionIndex);
-                fingers_vector.push_back(webmanager::CreateFingerDirect(b, info.key, index, timetableIndex, actionIndex));
+                fingers_vector.push_back(webmanager::CreateFingerDirect(b, info.key, index, scheduleName, actionIndex));
                 res = nvs_entry_next(&it);
             }
             nvs_release_iterator(it);
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseFingers,
-                                                       webmanager::CreateResponseFingersDirect(b, &fingers_vector).Union());
+                                                       webmanager::CreateResponseFingersDirect(b, &scheduleNames, &fingers_vector).Union());
         }
 
         case webmanager::Requests::Requests_RequestOpenDoor:
@@ -320,11 +325,11 @@ extern "C" void app_main(void)
     // timeseries::M* tsman=timeseries::M::GetSingleton();
     // tsman->Init(&zahl1, &zahl1, &zahl2, &zahl3);
     nvs_handle_t nvsFingerHandle;
-    nvs_handle_t nvsFingerTimetableHandle;
+    nvs_handle_t nvsFingerSchedulerHandle;
     nvs_handle_t nvsFingerActionHandle;
     nvs_handle_t nvsSchedulerHandle;
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAMESPACE, NVS_READWRITE, &nvsFingerHandle));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_TIMETABLE_NAMESPACE, NVS_READWRITE, &nvsFingerTimetableHandle));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsFingerSchedulerHandle));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_ACTION_NAMESPACE, NVS_READWRITE, &nvsFingerActionHandle));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerHandle));
 
@@ -333,12 +338,12 @@ extern "C" void app_main(void)
     led = new LED::M(PIN_LED, true);
     led->Begin();
 
-    Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
+    sched = new SCHEDULER::Scheduler(nvsSchedulerHandle);
+    Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerHandle, nvsFingerSchedulerHandle, nvsFingerActionHandle);
     w2f->begin();
 
-    SCHEDULER::Scheduler *w2t = new SCHEDULER::Scheduler(nvsSchedulerHandle);
 
-    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, w2t, nvsFingerHandle, nvsFingerTimetableHandle, nvsFingerActionHandle);
+    fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, sched, nvsFingerHandle, nvsFingerSchedulerHandle, nvsFingerActionHandle);
     fpm->begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);
 
     canmonitor = new CANMONITOR::M(w2f);
@@ -351,7 +356,7 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "HTTPD with SSL started");
     wman->RegisterHTTPDHandlers(http_server);
     ESP_LOGI(TAG, "HTTPD handlers registered");
-    std::vector<iMessageReceiver*>plugins{w2f, w2t};
+    std::vector<iMessageReceiver*>plugins{w2f, sched};
     wman->SetPlugins(&plugins);
     ESP_LOGI(TAG, "Webmanager plugins registered");
     wman->CallMeAfterInitializationToMarkCurrentPartitionAsValid();

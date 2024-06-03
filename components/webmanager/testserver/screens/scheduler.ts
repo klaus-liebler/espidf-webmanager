@@ -6,8 +6,18 @@ import { uRequestScheduler } from "../generated/flatbuffers/scheduler/u-request-
 import { eSchedule } from "../generated/flatbuffers/scheduler/e-schedule";
 import { ResponseSchedulerOpen } from "../generated/flatbuffers/scheduler/response-scheduler-open";
 import { OneWeekIn15Minutes } from "../generated/flatbuffers/scheduler/one-week-in15-minutes";
-import { OneWeekIn15MinutesData, ResponseScheduler, ResponseSchedulerList, ResponseSchedulerListItem, SunRandom, uResponseScheduler, uSchedule } from "../generated/flatbuffers/scheduler";
+import { OneWeekIn15MinutesData, ResponseScheduler, ResponseSchedulerList, ResponseSchedulerListItem, Schedule, SunRandom, uResponseScheduler, uSchedule } from "../generated/flatbuffers/scheduler";
 import { ResponseWrapper, Responses } from "../generated/flatbuffers/webmanager";
+
+export var exampleSchedules=[
+    {name:"OneWeekIn15MinutesA", type:eSchedule.OneWeekIn15Minutes},
+    {name:"OneWeekIn15MinutesB", type:eSchedule.OneWeekIn15Minutes},
+    {name:"PredefinedA", type:eSchedule.Predefined},
+    {name:"PredefinedB", type:eSchedule.Predefined},
+    {name:"SunRandomA", type:eSchedule.SunRandom},
+    {name:"SunRandomB", type:eSchedule.SunRandom},
+    
+]
 
 export function processScheduler_RequestScheduler(ws: WebSocket, m: RequestScheduler) {
     console.info(`processScheduler_RequestScheduler`);
@@ -15,15 +25,11 @@ export function processScheduler_RequestScheduler(ws: WebSocket, m: RequestSched
         case uRequestScheduler.RequestSchedulerList: {
             console.info(`processScheduler_RequestScheduler->uRequestScheduler.RequestSchedulerList`);
             let b = new flatbuffers.Builder(1024);
-
-            let itemsOffset = ResponseSchedulerList.createItemsVector(b, [
-                ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString("OneWeekIn15MinutesA"), eSchedule.OneWeekIn15Minutes),
-                ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString("OneWeekIn15MinutesB"), eSchedule.OneWeekIn15Minutes),
-                ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString("PredefinedA"), eSchedule.Predefined),
-                ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString("PredefinedB"), eSchedule.Predefined),
-                ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString("SunRandomA"), eSchedule.SunRandom),
-                ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString("SunRandomB"), eSchedule.SunRandom),
-            ]);
+            var data: number[]=[];
+            exampleSchedules.forEach(e => {
+                data.push(ResponseSchedulerListItem.createResponseSchedulerListItem(b, b.createString(e.name), e.type))
+            });
+            let itemsOffset = ResponseSchedulerList.createItemsVector(b, data);
 
             b.finish(
                 ResponseWrapper.createResponseWrapper(b, Responses.scheduler_ResponseScheduler,
@@ -45,10 +51,12 @@ export function processScheduler_RequestScheduler(ws: WebSocket, m: RequestSched
                         ResponseWrapper.createResponseWrapper(b, Responses.scheduler_ResponseScheduler,
                             ResponseScheduler.createResponseScheduler(b, uResponseScheduler.ResponseSchedulerOpen,
                                 ResponseSchedulerOpen.createResponseSchedulerOpen(b,
-                                    b.createString(mo.name()),
-                                    uSchedule.OneWeekIn15Minutes,
-                                    OneWeekIn15Minutes.createOneWeekIn15Minutes(b,
-                                        OneWeekIn15MinutesData.createOneWeekIn15MinutesData(b, new Array<number>(84).fill(fillValue))
+                                    Schedule.createSchedule(b, 
+                                        b.createString(mo.name()),
+                                        uSchedule.OneWeekIn15Minutes, 
+                                        OneWeekIn15Minutes.createOneWeekIn15Minutes(b,
+                                            OneWeekIn15MinutesData.createOneWeekIn15MinutesData(b, new Array<number>(84).fill(fillValue))
+                                        )
                                     )
                                 )
                             )
@@ -64,9 +72,11 @@ export function processScheduler_RequestScheduler(ws: WebSocket, m: RequestSched
                         ResponseWrapper.createResponseWrapper(b, Responses.scheduler_ResponseScheduler,
                             ResponseScheduler.createResponseScheduler(b, uResponseScheduler.ResponseSchedulerOpen,
                                 ResponseSchedulerOpen.createResponseSchedulerOpen(b,
-                                    b.createString(mo.name()),
-                                    uSchedule.SunRandom,
-                                    SunRandom.createSunRandom(b,offsetMinutes, randomMinutes)
+                                    Schedule.createSchedule(b, 
+                                        b.createString(mo.name()),
+                                        uSchedule.SunRandom,
+                                        SunRandom.createSunRandom(b,offsetMinutes, randomMinutes)
+                                    )
                                 )
                             )
                         )

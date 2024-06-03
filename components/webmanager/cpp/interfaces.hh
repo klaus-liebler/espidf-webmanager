@@ -16,4 +16,5 @@ class iMessageReceiver{
 class iScheduler{
     public:
     virtual uint16_t GetCurrentValueOfSchedule(const char* schedulerName)=0;
+    virtual void FillFlatbufferWithAvailableNames(flatbuffers::FlatBufferBuilder &b, std::vector<flatbuffers::Offset<flatbuffers::String>> vect)=0;
 };

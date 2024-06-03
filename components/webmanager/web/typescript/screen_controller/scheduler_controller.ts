@@ -1,5 +1,5 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { RequestDeleteFinger, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerTimetable, RequestWrapper, Requests, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
+import { RequestDeleteFinger, RequestWrapper, Requests, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import { TemplateResult, html, render } from "lit-html";
@@ -30,6 +30,7 @@ export class SchedulerScreenController extends ScreenController {
                 itemTemplates.push(i.OverallTemplate())
             }
             render(itemTemplates, this.tBodySchedules!.value);
+            
         }));
     }
 
@@ -75,44 +76,6 @@ export class SchedulerScreenController extends ScreenController {
         this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseDeleteFinger]);
     }
 
-    private sendRequestStoreFingerTimetable(fingerIndex: number, timetableIndex: number) {
-        console.log(`sendRequestStoreFingerTimetable fingerIndex=${fingerIndex} timetableIndex=${timetableIndex}`)
-        let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerTimetable,
-                RequestStoreFingerTimetable.createRequestStoreFingerTimetable(b, fingerIndex, timetableIndex)
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerTimetable]);
-    }
-
-    private sendRequestStoreFingerAction(fingerIndex: number, actionIndex: number) {
-        console.log(`sendRequestStoreFingerAction fingerIndex=${fingerIndex} actionIndex=${actionIndex}`)
-        let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerAction,
-                RequestStoreFingerAction.createRequestStoreFingerAction(b, fingerIndex, actionIndex)
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerAction]);
-    }
-
-    private sendRequestRenameFinger(fingerIndex: number, oldName:string,  newName: string) {
-        console.log(`sendRequestRenameFinger fingerIndex=${fingerIndex} newName=${newName}`)
-        let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestRenameFinger,
-                RequestRenameFinger.createRequestRenameFinger(b, b.createString(oldName), b.createString(newName))
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseRenameFinger]);
-    }
-
-   
-
-
-    
-
     onMessage(messageWrapper: ResponseWrapper): void {
         if(messageWrapper.responseType() != Responses.scheduler_ResponseScheduler)
             return;
@@ -131,7 +94,7 @@ export class SchedulerScreenController extends ScreenController {
             }
             case uResponseScheduler.ResponseSchedulerOpen:{
                 var open = <ResponseSchedulerOpen>m.content(new ResponseSchedulerOpen())
-                var o =this.name2item.get(open.name())
+                var o =this.name2item.get(open.payload().name())
                 if(o===undefined) return;
                 o.OnResponseSchedulerOpen(open);
                 break;
