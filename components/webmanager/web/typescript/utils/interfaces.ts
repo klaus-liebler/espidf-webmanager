@@ -22,7 +22,7 @@ export interface IAppManagement {
   showEnterPasswordDialog(messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
   showOKDialog(pSeverity: Severity, messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
   showOKCancelDialog(pSeverity: Severity, messageText: string, pHandler?: ((ok: boolean, value: string) => any)): void;
-  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, handler:iWeeklyScheduleDialogHandler, referenceHandle:any):void;
+  showWeeklyTimetableDialog(heading:string, initialValue: Array<number>, handler:iWeeklyScheduleDialogHandler, referenceHandle:any):void;
   showDialog<T extends DialogController>(type: { new(m: IAppManagement, pHandler?: ((ok: boolean, value: any) => any)): T; } , pHandler?: ((ok: boolean, value: string) => any)): void;
 };
 

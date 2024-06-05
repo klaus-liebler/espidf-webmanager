@@ -99,3 +99,13 @@ export function uint8Array2HexString(d: Uint8Array) {
   }
   return s;
 }
+
+export function numberArray2HexString(d: Array<number>) {
+  var s = "";
+  for (let index = 0; index < d.length; index++) {
+    var xx = d[index].toString(16);
+    if (xx.length == 1) s += "0" + xx;
+    else s += xx;
+  }
+  return s;
+}

@@ -1,34 +1,60 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { html } from "lit-html";
 import { DialogController } from "./dialog_controller";
+import { numberArray2HexString } from "../utils/common";
 
 const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const startHour=6;
 enum MarkingMode{TOGGLE,ON,OFF};
 export interface iWeeklyScheduleDialogHandler{
-    handleWeeklyScheduleDialog(ok: boolean, referenceHandle:any, value: Uint8Array);
+    handleWeeklyScheduleDialog(ok: boolean, referenceHandle:any, value: Array<number>);
+}
+
+export interface iSunRandomDialogHandler{
+    handleSunRandomDialog(ok: boolean, offsetMinutes: number, randomMinutes: number);
 }
 
 export class WeeklyScheduleDialog extends DialogController {
     
     
-    constructor(private header:string, private initialValue: Uint8Array|null, private handler:iWeeklyScheduleDialogHandler, private referenceHandle:any){
+    constructor(private header:string, private initialValue: Array<number>|null, private handler:iWeeklyScheduleDialogHandler, private referenceHandle:any){
         super()
     }
 
     private isSelecting = false;
     private markingMode:MarkingMode=MarkingMode.TOGGLE
     private tblBody:Ref<HTMLTableSectionElement>= createRef();
+
+    protected okHandler() {
+        
+        var arr = new Array<number>(84);
+        for(const d of [6,5,4,3,2,1,0]){
+            for(var hour=0;hour<24;hour+=2){
+                var value=0;
+                for(var quarterhour=0;quarterhour<8;quarterhour++){
+                    var sourceMarked=this.isSelected(d, ((hour+24-startHour)*4+quarterhour)%(4*24));
+                    value=value | (sourceMarked?1:0);
+                    value<<=1 //MSB ist dann immer die erste viertelstunde im 2h-Interval-byte
+                }
+                value>>=1
+                arr[d*12+(hour/2)]=value;
+            }
+        }
+        this.initialValue=arr;
+        console.log(`Save clicked. Value=${numberArray2HexString(arr)}`)
+        this.dialog.value!.close("Ok");
+        this.handler.handleWeeklyScheduleDialog(true, this.referenceHandle, arr);
+    }
    
     public Show(){
         if(this.initialValue){
-            
+            console.log(`Dialog opened. Value=${numberArray2HexString(this.initialValue)}`)
             for(var d=0;d<7;d++){
-                for(var two_hours_interval=0;two_hours_interval<12;two_hours_interval++){
-                    var value=this.initialValue[d*12+two_hours_interval];
+                for(var hour=0;hour<24;hour+=2){
+                    var value=this.initialValue[d*12+(hour/2)];
                     for(var quarterhour=0;quarterhour<8;quarterhour++){
                         var shouldBeMarked=value & (0b10000000>>quarterhour)
-                        this.setSelected(d, two_hours_interval*8+quarterhour, shouldBeMarked>0);
+                        this.setSelected(d, ((hour+24-startHour)*4+quarterhour)%(4*24), shouldBeMarked>0);
                     }
                 }
             }
@@ -38,13 +64,13 @@ export class WeeklyScheduleDialog extends DialogController {
         this.dialog.value!.showModal();
     }
 
-
     private tdMousedown(e: MouseEvent) {
         //console.log(`mousedown @ ${(<HTMLElement>e.target).innerText}`)
         this.isSelecting = true;
         this.tdMouseenter(e)
         e.preventDefault(); // Verhindert die Textauswahl
-    };
+    }
+
     private tdMouseenter(e: MouseEvent) {
         //console.log(`mouseenter @ ${(<HTMLElement>e.target).innerText}`)
         if (!this.isSelecting) return;
@@ -53,8 +79,8 @@ export class WeeklyScheduleDialog extends DialogController {
             case MarkingMode.ON:(<HTMLElement>e.target).classList.add('selected');break;
             case MarkingMode.OFF:(<HTMLElement>e.target).classList.remove('selected');break;
         }
-    
     }
+
     private tdMouseup(e: MouseEvent) {
         //console.log(`mouseup @ ${(<HTMLElement>e.target).innerText}`)
         this.isSelecting = false;
@@ -62,7 +88,6 @@ export class WeeklyScheduleDialog extends DialogController {
 
     private rdoChange(e:MouseEvent){
         var value:string =(<HTMLInputElement>e.target).value
-        console.log(`rdoChange to ${value}`);
         this.markingMode=MarkingMode[value];
     }
 
@@ -104,23 +129,7 @@ export class WeeklyScheduleDialog extends DialogController {
         this.handler.handleWeeklyScheduleDialog(false, this.referenceHandle, null);
     }
 
-    protected okHandler() {
-        console.log("Save clicked")
-        var arr = new Uint8Array(84);
-        for(const d of [6,5,4,3,2,1,0]){
-            for(var two_hours_interval=0;two_hours_interval<12;two_hours_interval++){
-                var value=0;
-                for(var quarterhour=0;quarterhour<8;quarterhour++){
-                    var sourceMarked=this.isSelected(d, two_hours_interval*8+quarterhour);
-                    value&=sourceMarked?1:0;
-                    value<<=1 //MSB ist dann immer die erste viertelstunde im 2h-Interval-byte
-                }
-                arr[d*12+two_hours_interval]=value;
-            }
-        }
-        this.dialog.value!.close("Ok");
-        this.handler.handleWeeklyScheduleDialog(true, this.referenceHandle, arr);
-    }
+    
 
     
     
@@ -132,8 +141,6 @@ export class WeeklyScheduleDialog extends DialogController {
         const rowTemplates = [];
         weekdays.map((day_name, day_index) =>  {
             rowTemplates.push(html`<tr><td>${day_name}</td>${weekdayTemplate(day_name, day_index)}</tr>`)
-            
-
         })
 
 
@@ -147,7 +154,7 @@ export class WeeklyScheduleDialog extends DialogController {
 
                 <fieldset>
                     <legend>Marking Mode</legend>
-                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="TOGGLE" checked />Toggle</label>
+                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="TOGGLE"  />Toggle</label>
                     <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="ON" />On</label>
                     <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="OFF" />Off</label>
                 </fieldset>

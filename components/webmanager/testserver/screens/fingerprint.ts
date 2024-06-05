@@ -4,9 +4,9 @@ import { Finger, NotifyEnrollNewFinger, RequestEnrollNewFinger, RequestStoreFing
 import { exampleSchedules} from "./scheduler"
 
 export var exampleFingers=[
-    {name:"Klaus rechts mitte", index:1, schedule:exampleSchedules[1].name, action:1},
-    {name:"Steffi links mitte", index:2, schedule:exampleSchedules[4].name, action:3},
-    {name:"Klara rechts zeige", index:3, schedule:exampleSchedules[4].name, action:2},
+    {name:"Klaus rechts mitte", index:1, schedule:"OneWeekIn15MinutesA", action:1},
+    {name:"Steffi links mitte", index:2, schedule:"PredefinedA", action:3},
+    {name:"Klara rechts zeige", index:3, schedule:"SunRandomA", action:2},
 ]
 
 export function processRequestStoreFingerAction(ws:WebSocket, req: RequestStoreFingerAction){
@@ -59,8 +59,8 @@ export function sendResponseFingers(ws: WebSocket) {
     })
   
     var scheduleNames: number[]=[];
-    exampleSchedules.forEach(e => {
-        scheduleNames.push(b.createString(e.name))
+    exampleSchedules.forEach((v,k) => {
+        scheduleNames.push(b.createString(k))
     });
 
     b.finish(ResponseWrapper.createResponseWrapper(b, Responses.ResponseFingers,

@@ -87,7 +87,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     this.renderAndShowDialog(new OkCancelDialog(pSeverity, messageText, pHandler));
   }
 
-  showWeeklyTimetableDialog(heading:string, initialValue: Uint8Array, handler:iWeeklyScheduleDialogHandler, referenceHandle:any):void{
+  showWeeklyTimetableDialog(heading:string, initialValue: Array<number>, handler:iWeeklyScheduleDialogHandler, referenceHandle:any):void{
     this.renderAndShowDialog(new WeeklyScheduleDialog(heading, initialValue, handler, referenceHandle));
   }
 
@@ -96,6 +96,7 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
   }
 
   private renderAndShowDialog(d:DialogController){
+    //this.dialog.value!.innerText="";
     render(d.Template(), this.dialog.value!)
     d.Show();
   }

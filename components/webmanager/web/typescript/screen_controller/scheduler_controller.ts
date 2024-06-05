@@ -22,8 +22,9 @@ import {CreateNewScheduleDialog} from "../dialog_controller/CreateNewScheduleDia
 
 export class SchedulerScreenController extends ScreenController {
     private btnNew() {
-        this.appManagement.showDialog(new CreateNewScheduleDialog(Array.from(this.name2item.keys()), this.appManagement,(ok, item)=>{
+        this.appManagement.showDialog(new CreateNewScheduleDialog(Array.from(this.name2item.keys()), this.appManagement, (ok, item)=>{
             if(!ok) return;
+            item.OnCreate()
             this.name2item.set(item.name, item);
             var itemTemplates:Array<TemplateResult<1>>=[];
             for(const i of this.name2item.values()){

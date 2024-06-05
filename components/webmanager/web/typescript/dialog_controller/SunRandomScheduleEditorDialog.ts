@@ -1,24 +1,25 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
 import { html } from "lit-html";
 import { DialogController } from "./dialog_controller";
+import { iSunRandomDialogHandler } from "./weeklyschedule_dialog";
 
 export class SunRandomScheduleEditorDialog extends DialogController {
 
     protected inputOffset: Ref<HTMLInputElement> = createRef();
     protected inputRandom: Ref<HTMLInputElement> = createRef();
 
-    constructor(protected nameOfSchedule: string, private offsetMinutes: number, private randomMinutes: number, protected handler: ((ok: boolean, offsetMinutes: number, randomMinutes: number) => any) | undefined) {
+    constructor(protected nameOfSchedule: string, private offsetMinutes: number, private randomMinutes: number, protected handler: iSunRandomDialogHandler) {
         super();
     }
 
     protected cancelHandler() {
         this.dialog.value!.close('Cancel');
-        this.handler?.(false, 0, 0);
+        this.handler.handleSunRandomDialog(false, 0, 0);
     }
 
     protected okHandler() {
         this.dialog.value!.close('Ok');
-        this.handler?.(true, this.inputOffset.value!.valueAsNumber, this.inputRandom.value!.valueAsNumber);
+        this.handler.handleSunRandomDialog(true, this.inputOffset.value!.valueAsNumber, this.inputRandom.value!.valueAsNumber);
     }
 
     protected backdropClickedHandler(e: MouseEvent) {
