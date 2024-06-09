@@ -6,6 +6,7 @@ import { TemplateResult, html, render } from "lit-html";
 
 
 import calendarPlus from '../../svgs/regular/calendar-plus.svg?raw'
+import rotate from '../../svgs/solid/rotate.svg?raw'
 import { unsafeSVG } from "lit-html/directives/unsafe-svg.js";
 import { ResponseScheduler } from "../../generated/flatbuffers/scheduler/response-scheduler";
 import { uResponseScheduler } from "../../generated/flatbuffers/scheduler/u-response-scheduler";
@@ -18,6 +19,7 @@ import { RequestSchedulerList } from "../../generated/flatbuffers/scheduler/requ
 import { ResponseSchedulerOpen } from "../../generated/flatbuffers/scheduler/response-scheduler-open";
 import {ScheduleItem, OneWeekIn15MinutesSchedule, SunRandomSchedule, PredefinedSchedule} from "../utils/schedule_items"
 import {CreateNewScheduleDialog} from "../dialog_controller/CreateNewScheduleDialog.ts"
+import { RequestSchedulerDelete } from "../../generated/flatbuffers/scheduler/request-scheduler-delete.ts";
 
 
 export class SchedulerScreenController extends ScreenController {
@@ -35,6 +37,10 @@ export class SchedulerScreenController extends ScreenController {
         }));
     }
 
+    private btnUpdate(){
+        this.onStart_or_onRestart_or_onUpdateClicked();
+    }
+
     private tBodySchedules:Ref<HTMLTableSectionElement>= createRef();
     private name2item:Map<string, ScheduleItem>=new Map<string, ScheduleItem>();
 
@@ -44,6 +50,7 @@ export class SchedulerScreenController extends ScreenController {
         
         <div class="buttons">
             <button class="withsvg" @click=${() => this.btnNew()}>${unsafeSVG(calendarPlus)}<span>New<span></button>
+            <button class="withsvg" @click=${() => this.btnUpdate()}>${unsafeSVG(rotate)}<span>Update List<span></button>
         </div>
         
 
@@ -67,21 +74,23 @@ export class SchedulerScreenController extends ScreenController {
 
 
 
-    public sendRequestDeleteFinger(name: string) {
+    public sendRequestDeleteSchedule(name: string) {
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestDeleteFinger,
-                RequestDeleteFinger.createRequestDeleteFinger(b, b.createString(name))
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b,
+                uRequestScheduler.RequestSchedulerDelete,
+                RequestSchedulerDelete.createRequestSchedulerDelete(b, b.createString(name))
+            ),
+            [Responses.scheduler_ResponseScheduler]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseDeleteFinger]);
     }
 
     onMessage(messageWrapper: ResponseWrapper): void {
         if(messageWrapper.responseType() != Responses.scheduler_ResponseScheduler)
             return;
         let m = <ResponseScheduler>messageWrapper.response(new ResponseScheduler());
-        console.log(`Received Message in scheduler`)
+        console.log(`Received "${uResponseScheduler[m.contentType()]}"-message in scheduler`)
         switch (m.contentType()) {
             case uResponseScheduler.ResponseSchedulerList:{
                 var itemTemplates:Array<TemplateResult<1>>=[];
@@ -95,11 +104,16 @@ export class SchedulerScreenController extends ScreenController {
             }
             case uResponseScheduler.ResponseSchedulerOpen:{
                 var open = <ResponseSchedulerOpen>m.content(new ResponseSchedulerOpen())
-                var o =this.name2item.get(open.payload().name())
-                if(o===undefined) return;
-                o.OnResponseSchedulerOpen(open);
+                if(!this.name2item.has(open.payload().name())){
+                    console.warn(`OpenMessage for ${open.payload().name()}, but this is not contained in [${Array.from(this.name2item.keys()).join(",")}].`)
+                }else{
+                    var o =this.name2item.get(open.payload().name())
+                    o.OnResponseSchedulerOpen(open);
+                }
                 break;
             }
+            default:
+                break;
         }
         
     }
@@ -125,18 +139,16 @@ export class SchedulerScreenController extends ScreenController {
         itemTemplates.push(elem.OverallTemplate())
     }
 
-    private onStart_or_onRestart(){
+    private onStart_or_onRestart_or_onUpdateClicked(){
         let b = new flatbuffers.Builder(256);       
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerList, 
-                    RequestSchedulerList.createRequestSchedulerList(b)
-                )
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerList, 
+                RequestSchedulerList.createRequestSchedulerList(b)
+            ),
+            [Responses.scheduler_ResponseScheduler]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
     }
     
     onCreate(): void {
@@ -145,10 +157,10 @@ export class SchedulerScreenController extends ScreenController {
 
 
     onFirstStart(): void {
-        this.onStart_or_onRestart()
+        this.onStart_or_onRestart_or_onUpdateClicked()
     }
     onRestart(): void {
-        this.onStart_or_onRestart()
+        this.onStart_or_onRestart_or_onUpdateClicked()
     }
     onPause(): void {
     }

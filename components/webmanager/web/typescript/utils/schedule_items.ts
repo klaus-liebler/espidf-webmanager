@@ -8,13 +8,17 @@ import { ResponseSchedulerOpen } from "../../generated/flatbuffers/scheduler/res
 import { SunRandom } from "../../generated/flatbuffers/scheduler/sun-random";
 import { uRequestScheduler } from "../../generated/flatbuffers/scheduler/u-request-scheduler";
 import { uSchedule } from "../../generated/flatbuffers/scheduler/u-schedule";
-import { RequestWrapper, Requests, Responses } from "../../generated/flatbuffers/webmanager";
+import { Requests, Responses } from "../../generated/flatbuffers/webmanager";
 import * as flatbuffers from 'flatbuffers';
 import { RequestSchedulerSave } from "../../generated/flatbuffers/scheduler/request-scheduler-save";
 import { Schedule } from "../../generated/flatbuffers/scheduler/schedule";
 import { OneWeekIn15MinutesData } from "../../generated/flatbuffers/scheduler/one-week-in15-minutes-data";
 import { iSunRandomDialogHandler, iWeeklyScheduleDialogHandler } from "../dialog_controller/weeklyschedule_dialog";
 import { numberArray2HexString } from "./common";
+import { RequestSchedulerDelete } from "../../generated/flatbuffers/scheduler/request-scheduler-delete";
+import { SunRandomScheduleEditorDialog } from "../dialog_controller/SunRandomScheduleEditorDialog";
+import { RequestSchedulerRename } from "../../generated/flatbuffers/scheduler/request-scheduler-rename";
+
 
 export abstract class ScheduleItem {
 
@@ -61,34 +65,37 @@ export class SunRandomSchedule extends ScheduleItem implements iSunRandomDialogH
 
     public SaveToServer():void{
         let b = new flatbuffers.Builder(1024);       
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerSave, 
-                    RequestSchedulerSave.createRequestSchedulerSave(b, 
-                        Schedule.createSchedule(b,
-                            b.createString(this.name), 
-                            uSchedule.SunRandom,
-                            SunRandom.createSunRandom(b,
-                                this.offsetMinutes,
-                                this.randomMinutes
-                            )
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerSave, 
+                RequestSchedulerSave.createRequestSchedulerSave(b, 
+                    Schedule.createSchedule(b,
+                        b.createString(this.name), 
+                        uSchedule.SunRandom,
+                        SunRandom.createSunRandom(b,
+                            this.offsetMinutes,
+                            this.randomMinutes
                         )
                     )
                 )
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
     }
 
     public OnResponseSchedulerOpen(m:ResponseSchedulerOpen):void{
        
         if(m.payload().scheduleType()!=uSchedule.SunRandom)
             return;
+        if(m.payload().name()!=this.name){
+            console.error("m.payload().name()!=this.name")
+            return;
+        }
         var rso = <SunRandom>m.payload().schedule(new SunRandom())
         this.offsetMinutes=rso.offsetMinutes();
         this.randomMinutes=rso.randomMinutes();
+        this.appManagement.showDialog(new SunRandomScheduleEditorDialog(this.name, this.offsetMinutes, this.randomMinutes, this))
     }
 
     public OnCreate(): void {
@@ -107,19 +114,46 @@ export class SunRandomSchedule extends ScheduleItem implements iSunRandomDialogH
 
     private btnEditClicked() {
         let b = new flatbuffers.Builder(256);       
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerOpen, 
-                    RequestSchedulerOpen.createRequestSchedulerOpen(b, b.createString(this.name), eSchedule.SunRandom)
-                )
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerOpen, 
+                RequestSchedulerOpen.createRequestSchedulerOpen(b, b.createString(this.name), eSchedule.SunRandom)
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
     }
 
-    protected CoreEditTemplate=()=>html`<button @click=${()=>this.btnEditClicked()}>Edit</button>`
+    private btnDeleteClicked() {
+        let b = new flatbuffers.Builder(256);       
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerDelete, 
+                RequestSchedulerDelete.createRequestSchedulerDelete(b, b.createString(this.name))
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
+    }
+
+    private handleRenameDialog(ok:boolean, newName:string){
+        if(!ok) return;
+        let b = new flatbuffers.Builder(256);       
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerRename, 
+                RequestSchedulerRename.createRequestSchedulerRename(b, b.createString(this.name), b.createString(newName))
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
+    }
+
+    private btnRenameClicked() {
+        this.appManagement.showEnterFilenameDialog("Enter new name", (ok, value)=>this.handleRenameDialog(ok, value));
+    }
+
+    protected CoreEditTemplate=()=>html`<button @click=${()=>this.btnEditClicked()}>Edit</button><button @click=${()=>this.btnDeleteClicked()}>Delete</button><button @click=${()=>this.btnRenameClicked()}>Rename</button>`
 }
 
 export class OneWeekIn15MinutesSchedule extends ScheduleItem implements iWeeklyScheduleDialogHandler{
@@ -158,40 +192,65 @@ export class OneWeekIn15MinutesSchedule extends ScheduleItem implements iWeeklyS
 
     public SaveToServer():void{
         let b = new flatbuffers.Builder(1024)
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerSave, 
-                    RequestSchedulerSave.createRequestSchedulerSave(b, 
-                        Schedule.createSchedule(b,
-                            b.createString(this.name), 
-                            uSchedule.OneWeekIn15Minutes,
-                            OneWeekIn15Minutes.createOneWeekIn15Minutes(b,
-                                OneWeekIn15MinutesData.createOneWeekIn15MinutesData(b, this.value)
-                            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerSave, 
+                RequestSchedulerSave.createRequestSchedulerSave(b, 
+                    Schedule.createSchedule(b,
+                        b.createString(this.name), 
+                        uSchedule.OneWeekIn15Minutes,
+                        OneWeekIn15Minutes.createOneWeekIn15Minutes(b,
+                            OneWeekIn15MinutesData.createOneWeekIn15MinutesData(b, this.value)
                         )
                     )
                 )
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
     }
 
     private btnEditClicked(e:MouseEvent){
 
         let b = new flatbuffers.Builder(256);       
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, 
-                Requests.scheduler_RequestScheduler,
-                RequestScheduler.createRequestScheduler(b, 
-                    uRequestScheduler.RequestSchedulerOpen, 
-                    RequestSchedulerOpen.createRequestSchedulerOpen(b, b.createString(this.name), eSchedule.OneWeekIn15Minutes)
-                )
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.scheduler_ResponseScheduler], 3000);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerOpen, 
+                RequestSchedulerOpen.createRequestSchedulerOpen(b, b.createString(this.name), eSchedule.OneWeekIn15Minutes)
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
     }
 
-    protected CoreEditTemplate=()=>html`<button @click=${(e:MouseEvent)=>this.btnEditClicked(e)}>Edit</button>`
+    private btnDeleteClicked(_e:MouseEvent) {
+        let b = new flatbuffers.Builder(256);       
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerDelete, 
+                RequestSchedulerDelete.createRequestSchedulerDelete(b, b.createString(this.name))
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
+    }
+
+    private handleRenameDialog(ok:boolean, newName:string){
+        if(!ok) return;
+        let b = new flatbuffers.Builder(256);       
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.scheduler_RequestScheduler,
+            RequestScheduler.createRequestScheduler(b, 
+                uRequestScheduler.RequestSchedulerRename, 
+                RequestSchedulerRename.createRequestSchedulerRename(b, b.createString(this.name), b.createString(newName))
+            ),
+            [Responses.scheduler_ResponseScheduler]
+        )
+    }
+
+    private btnRenameClicked(_e:MouseEvent) {
+        this.appManagement.showEnterFilenameDialog("Enter new name", (ok, value)=>this.handleRenameDialog(ok, value));
+    }
+
+    protected CoreEditTemplate=()=>html`<button @click=${(e:MouseEvent)=>this.btnEditClicked(e)}>Edit</button><button @click=${(e:MouseEvent)=>this.btnDeleteClicked(e)}>Delete</button><button @click=${(e:MouseEvent)=>this.btnRenameClicked(e)}>Rename</button>`
 }

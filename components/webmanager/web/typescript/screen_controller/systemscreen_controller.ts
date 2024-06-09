@@ -22,18 +22,19 @@ export class SystemScreenController extends ScreenController {
 
     private sendRequestRestart() {
         let b = new flatbuffers.Builder(1024);
-        let n = RequestRestart.createRequestRestart(b);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestRestart, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array());
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestRestart,
+            RequestRestart.createRequestRestart(b)
+        );
     }
 
     private sendRequestSystemdata() {
         let b = new flatbuffers.Builder(1024);
-        let n = RequestSystemData.createRequestSystemData(b);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestSystemData, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseSystemData], 3000);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestSystemData,
+            RequestSystemData.createRequestSystemData(b),
+            [Responses.ResponseSystemData]
+        );
     }
 
     partitionString(original: string | null, def: string) {

@@ -98,7 +98,7 @@ export class FingerprintScreenController extends ScreenController {
                 <tr>
                     <th>Name</th>
                     <th>Index</th>
-                    <th>Timetable</th>
+                    <th>Scheduler</th>
                     <th>Action</th>
                     <th>Manage Entry</th>
                 </tr>
@@ -126,45 +126,40 @@ export class FingerprintScreenController extends ScreenController {
 
     public sendRequestDeleteFinger(name: string) {
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestDeleteFinger,
-                RequestDeleteFinger.createRequestDeleteFinger(b, b.createString(name))
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseDeleteFinger]);
+        this.appManagement.WrapAndFinishAndSend(b, 
+            Requests.RequestDeleteFinger, 
+            RequestDeleteFinger.createRequestDeleteFinger(b, b.createString(name)), 
+            [Responses.ResponseDeleteFinger]);
     }
 
     private sendRequestStoreFingerTimetable(fingerIndex: number, scheduleName: string) {
         console.log(`sendRequestStoreFingerTimetable fingerIndex=${fingerIndex} scheduleName=${scheduleName}`)
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerSchedule,
-                RequestStoreFingerSchedule.createRequestStoreFingerSchedule(b, fingerIndex, b.createString(scheduleName))
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestStoreFingerSchedule,
+            RequestStoreFingerSchedule.createRequestStoreFingerSchedule(b, fingerIndex, b.createString(scheduleName)),
+            [Responses.ResponseStoreFingerSchedule]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerSchedule]);
     }
 
     private sendRequestStoreFingerAction(fingerIndex: number, actionIndex: number) {
         console.log(`sendRequestStoreFingerAction fingerIndex=${fingerIndex} actionIndex=${actionIndex}`)
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestStoreFingerAction,
-                RequestStoreFingerAction.createRequestStoreFingerAction(b, fingerIndex, actionIndex)
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestStoreFingerAction,
+            RequestStoreFingerAction.createRequestStoreFingerAction(b, fingerIndex, actionIndex),
+            [Responses.ResponseStoreFingerAction]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseStoreFingerAction]);
     }
 
     private sendRequestRenameFinger(fingerIndex: number, oldName:string,  newName: string) {
         console.log(`sendRequestRenameFinger fingerIndex=${fingerIndex} newName=${newName}`)
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestRenameFinger,
-                RequestRenameFinger.createRequestRenameFinger(b, b.createString(oldName), b.createString(newName))
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestRenameFinger,
+            RequestRenameFinger.createRequestRenameFinger(b, b.createString(oldName), b.createString(newName)),
+            [Responses.ResponseRenameFinger]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseRenameFinger]);
     }
 
     private insertParameter(name: string, value: string | number) {
@@ -340,10 +335,11 @@ export class FingerprintScreenController extends ScreenController {
 
     btnOpenDoor() {
         let b = new flatbuffers.Builder(1024);
-        let n = RequestOpenDoor.createRequestOpenDoor(b);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestOpenDoor, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array());
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestOpenDoor,
+            RequestOpenDoor.createRequestOpenDoor(b),
+            [Responses.ResponseOpenDoor]
+        );
     }
     btnUpdateFingers() {
         this.sendRequestFingers();
@@ -355,42 +351,40 @@ export class FingerprintScreenController extends ScreenController {
             }
             console.log(`Send RequestEnrollNewFinger name=${name}`)
             let b = new flatbuffers.Builder(1024);
-            b.finish(
-                RequestWrapper.createRequestWrapper(b, Requests.RequestEnrollNewFinger,
-                    RequestEnrollNewFinger.createRequestEnrollNewFinger(b, b.createString(name))
-                )
+            this.appManagement.WrapAndFinishAndSend(b,
+                Requests.RequestEnrollNewFinger,
+                RequestEnrollNewFinger.createRequestEnrollNewFinger(b, b.createString(name)),
+                [Responses.ResponseEnrollNewFinger]
             );
-            this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseEnrollNewFinger]);
         })
     }
 
     btnFingerprintGetSensorInfo() {
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestFingerprintSensorInfo,
-                RequestFingerprintSensorInfo.createRequestFingerprintSensorInfo(b)
-            )
-        );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseFingerprintSensorInfo]);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestFingerprintSensorInfo,
+            RequestFingerprintSensorInfo.createRequestFingerprintSensorInfo(b),
+            [Responses.ResponseFingerprintSensorInfo]
+        )
     }
     btnDeleteAll() {
         this.appManagement.showOKCancelDialog(Severity.WARN, "Please confirm to DELETE ALL FINGERPRINTS", (ok: boolean) => {
             if (!ok) return;
             let b = new flatbuffers.Builder(1024);
-            let n = RequestDeleteAllFingers.createRequestDeleteAllFingers(b);
-            let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestDeleteAllFingers, n);
-            b.finish(mw);
-            this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseDeleteAllFingers]);
+            this.appManagement.WrapAndFinishAndSend(b,
+                Requests.RequestDeleteAllFingers,
+                RequestDeleteAllFingers.createRequestDeleteAllFingers(b),
+                [Responses.ResponseDeleteAllFingers]
+            );
         })
     }
     btnCancelInstruction() {
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestCancelInstruction,
-                RequestCancelInstruction.createRequestCancelInstruction(b)
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestCancelInstruction,
+            RequestCancelInstruction.createRequestCancelInstruction(b),
+            [Responses.ResponseCancelInstruction]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseCancelInstruction]);
     }
     onCreate(): void {
         this.appManagement.registerWebsocketMessageTypes(this, Responses.ResponseEnrollNewFinger, Responses.ResponseDeleteFinger, Responses.ResponseDeleteAllFingers, Responses.ResponseFingerprintSensorInfo, Responses.ResponseFingers, Responses.NotifyEnrollNewFinger, Responses.NotifyFingerDetected);
@@ -398,12 +392,11 @@ export class FingerprintScreenController extends ScreenController {
 
     private sendRequestFingers() {
         let b = new flatbuffers.Builder(1024);
-        b.finish(
-            RequestWrapper.createRequestWrapper(b, Requests.RequestFingers,
-                RequestFingers.createRequestFingers(b)
-            )
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestFingers,
+            RequestFingers.createRequestFingers(b),
+            [Responses.ResponseFingers]
         );
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseFingers]);
     }
 
     onFirstStart(): void {

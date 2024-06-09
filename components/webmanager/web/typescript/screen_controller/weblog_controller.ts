@@ -30,11 +30,12 @@ export class WeblogScreenController extends ScreenController {
     private tblLogs:Ref<HTMLTableSectionElement> = createRef();
 
     sendRequestJournal(){
-        let b = new flatbuffers.Builder(256);
-        let n = RequestJournal.createRequestJournal(b);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestJournal, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseJournal], 3000);
+        var b = new flatbuffers.Builder(256);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestJournal,
+            RequestJournal.createRequestJournal(b),
+            [Responses.ResponseJournal]
+        );
     }
 
     onCreate(): void {

@@ -87,6 +87,8 @@ namespace webmanager
         bool scanIsActive{false};
         std::vector<iMessageReceiver*> *plugins{nullptr};
 
+        
+
         M(){}
 
         bool hasRealtime(){
@@ -499,16 +501,19 @@ namespace webmanager
                 this->userSettings->handleRequestSetUserSettings(req, &ws_pkt, mw->request_as_RequestSetUserSettings());
                 break;
             default:{
-                bool success{false};
+                eMessageReceiverResult success{eMessageReceiverResult::NOT_FOR_ME};
                 if(plugins){
                     for(auto mr:*plugins){
-                        if(mr->provideWebsocketMessage(this, req, &ws_pkt, mw)==ESP_OK){
-                            success=true;
+                        success=mr->provideWebsocketMessage(this, req, &ws_pkt, mw);
+                        if(success!=eMessageReceiverResult::NOT_FOR_ME){
+                            break;
                         }
                     }
                 }
-                if(!success){
+                if(success==eMessageReceiverResult::NOT_FOR_ME){
                     ESP_LOGW(TAG, "Not yet implemented request %d, neither internal nor in a plugin", (int)mw->request_type());
+                }else if(success==eMessageReceiverResult::FOR_ME_BUT_FAILED){
+                    ESP_LOGW(TAG, "Request %d has been implemented by plugin, but processing failed", (int)mw->request_type());
                 }
             }
                 
@@ -746,6 +751,10 @@ namespace webmanager
             return singleton;
         }
 
+        WifiStationState GetStaState(){
+            return this->staState;
+        }
+
         const char* GetHostname(){
             return this->hostname;
         }
@@ -754,9 +763,9 @@ namespace webmanager
             return this->userSettings;
         }
         
-        esp_err_t WrapAndFinishAndSendAsync(::flatbuffers::FlatBufferBuilder &_fbb, webmanager::Responses message_type = webmanager::Responses_NONE, ::flatbuffers::Offset<void> message = 0){
-            _fbb.Finish(CreateResponseWrapper(_fbb, message_type, message));
-            auto *a = new AsyncResponse(&_fbb);
+        esp_err_t WrapAndFinishAndSendAsync(::flatbuffers::FlatBufferBuilder &b, webmanager::Responses message_type = webmanager::Responses_NONE, ::flatbuffers::Offset<void> message = 0){
+            b.Finish(CreateResponseWrapper(b, message_type, message));
+            auto *a = new AsyncResponse(&b);
             if(httpd_queue_work(http_server, M::ws_async_send, a)!=ESP_OK){delete(a);}
              return ESP_OK;
         }

@@ -1,7 +1,8 @@
-import type { ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
+import { Requests, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { DialogController } from "../dialog_controller/dialog_controller";
 import { iWeeklyScheduleDialogHandler } from "../dialog_controller/weeklyschedule_dialog";
 import type { Severity } from "./common";
+import * as flatbuffers from "flatbuffers"
 
 export interface IWebsocketMessageListener {
   onMessage(messageWrapper: ResponseWrapper): void;
@@ -14,7 +15,7 @@ export interface IDialogBodyRenderer {
 export interface IAppManagement {
   registerWebsocketMessageTypes(listener: IWebsocketMessageListener, ...messageTypes: number[]): (() => void);
   unregister(listener: IWebsocketMessageListener): void;
-  sendWebsocketMessage(data: ArrayBuffer, messagesToUnlock?: Array<Responses>, maxWaitingTimeMs?: number): void;
+  WrapAndFinishAndSend(b:flatbuffers.Builder, message_type:Requests,  message:flatbuffers.Offset, messagesToUnlock?: Array<Responses>, maxWaitingTimeMs?: number);
   log(text: string): void;
   showSnackbar(severity: Severity, text: string): void;
   showDialog<T extends DialogController>(dialog:T): void;

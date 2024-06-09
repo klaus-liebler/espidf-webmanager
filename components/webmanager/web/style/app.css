@@ -192,6 +192,13 @@
   to {bottom: 0; opacity: 0;}
 }
 
+input:invalid {
+  border: 2px dashed red;
+}
+
+input:invalid:required {
+  background-image: linear-gradient(to right, pink, lightgreen);
+}
 
 .info {
   color: rgb(102, 249, 102);

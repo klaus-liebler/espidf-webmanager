@@ -3,8 +3,8 @@ import "../style/app.css"
 import { TemplateResult, html, render } from "lit-html";
 import RouterMenu, { IRouteHandler, Route } from "./routermenu";
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { IAppManagement, IDialogBodyRenderer, IWebsocketMessageListener } from "./utils/interfaces";
-import { ResponseWrapper, NotifyLiveLogItem, Responses } from "../generated/flatbuffers/webmanager";
+import { IAppManagement, IWebsocketMessageListener } from "./utils/interfaces";
+import { ResponseWrapper, NotifyLiveLogItem, Responses, Requests, RequestWrapper } from "../generated/flatbuffers/webmanager";
 import { DialogController, FilenameDialog, OkCancelDialog, OkDialog, PasswordDialog } from "./dialog_controller/dialog_controller";
 import { Severity, Html, severity2class, severity2symbol } from "./utils/common";
 import { WS_URL } from "./constants";
@@ -12,7 +12,6 @@ import * as flatbuffers from "flatbuffers"
 import { DefaultScreenController, ScreenController } from "./screen_controller/screen_controller";
 import { CanMonitorScreenController } from "./screen_controller/canmonitor_controller";
 import { WifimanagerController as WifimanagerScreenController } from "./screen_controller/wifimanager_controller";
-import { TimeseriesController } from "./screen_controller/timeseries_controller";
 import { runCarRace } from "./screen_controller/racinggame_controller";
 import { FingerprintScreenController } from "./screen_controller/fingerprint_controller";
 import { SystemScreenController } from "./screen_controller/systemscreen_controller";
@@ -130,7 +129,14 @@ class AppController implements IAppManagement, IWebsocketMessageListener {
     this.showOKDialog(Severity.ERROR, "Server did not respond");
   }
 
-  public sendWebsocketMessage(data: ArrayBuffer, messagesToUnlock: Array<Responses> = [Responses.NONE], maxWaitingTimeMs: number = 2000): void {
+  public WrapAndFinishAndSend(b:flatbuffers.Builder, message_type:Requests,  message:flatbuffers.Offset, messagesToUnlock: Array<Responses> = [Responses.NONE], maxWaitingTimeMs: number = 3000){
+    console.log(`Send Request ${Requests[message_type]} to server an expecting ${messagesToUnlock.map((v)=>Responses[v]).join(", ")} as answer`)
+    b.finish(RequestWrapper.createRequestWrapper(b, message_type,message));
+    var data=b.asUint8Array()
+    this.sendWebsocketMessage(data, messagesToUnlock, maxWaitingTimeMs);
+  }
+
+  private sendWebsocketMessage(data: ArrayBuffer, messagesToUnlock: Array<Responses> = [Responses.NONE], maxWaitingTimeMs: number = 2000): void {
     if (this.socket!.readyState != this.socket!.OPEN) {
       console.info('sendWebsocketMessage --> not OPEN --> buffer')
       //still in connection state -->buffer

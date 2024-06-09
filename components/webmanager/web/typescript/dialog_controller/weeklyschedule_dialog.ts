@@ -22,7 +22,7 @@ export class WeeklyScheduleDialog extends DialogController {
     }
 
     private isSelecting = false;
-    private markingMode:MarkingMode=MarkingMode.TOGGLE
+    private markingMode:MarkingMode=MarkingMode.ON
     private tblBody:Ref<HTMLTableSectionElement>= createRef();
 
     protected okHandler() {
@@ -61,6 +61,8 @@ export class WeeklyScheduleDialog extends DialogController {
         }else{
             this.setAll(false);
         }
+        var radios= <NodeListOf<HTMLInputElement>>document.getElementsByName("mode")
+        radios[1].checked=true;
         this.dialog.value!.showModal();
     }
 
@@ -70,6 +72,8 @@ export class WeeklyScheduleDialog extends DialogController {
         this.tdMouseenter(e)
         e.preventDefault(); // Verhindert die Textauswahl
     }
+
+    
 
     private tdMouseenter(e: MouseEvent) {
         //console.log(`mouseenter @ ${(<HTMLElement>e.target).innerText}`)
@@ -154,9 +158,9 @@ export class WeeklyScheduleDialog extends DialogController {
 
                 <fieldset>
                     <legend>Marking Mode</legend>
-                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="TOGGLE"  />Toggle</label>
-                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="ON" />On</label>
-                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="OFF" />Off</label>
+                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="TOGGLE" ?checked=${this.markingMode == MarkingMode.TOGGLE} />Toggle</label>
+                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="ON" ?checked=${this.markingMode == MarkingMode.ON}/>On</label>
+                    <label><input @change=${(e:MouseEvent) => this.rdoChange(e)} type="radio" name="mode" value="OFF" ?checked=${this.markingMode == MarkingMode.OFF}/>Off</label>
                 </fieldset>
                 <fieldset>
                     <legend>Comfort Copy</legend>

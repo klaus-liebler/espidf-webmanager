@@ -65,8 +65,7 @@ constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_27};
 
 
 constexpr gpio_num_t PIN_FINGER_TX_HOST{GPIO_NUM_40};
-//constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_38};
-constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_7};
+constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_38};
 constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_39};
 
 constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_6};
@@ -89,7 +88,7 @@ constexpr gpio_num_t PIN_CAN_RX{GPIO_NUM_10};
 constexpr twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
 constexpr twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
 
-LED::BlinkPattern SLOW(300, 1700);
+LED::BlinkPattern SLOW(200, 1000);
 LED::BlinkPattern FAST(200, 200);
 
 class Webmanager2Fingerprint2Hardware : public iMessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
@@ -106,14 +105,22 @@ private:
     {
         ESP_LOGI(TAG, "Central Management Task 'Webmanager2Fingerprint2Hardware' running");
         buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
- 
+        auto wman = webmanager::M::GetSingleton();
+        webmanager::WifiStationState staState{webmanager::WifiStationState::NO_CONNECTION};
         while (true)
         {
             time_t now = millis();
             bool energizeMotor = (now - fingerDetected) < 1000;
             gpio_set_level(PIN_MOTOR, energizeMotor);
-            led->SetPixel(energizeMotor);
             buzzer->Loop();
+            auto newStaState=wman->GetStaState();
+            if(newStaState!=webmanager::WifiStationState::CONNECTED && newStaState!=staState){
+                led->AnimatePixel(&FAST);
+            }else if(newStaState==webmanager::WifiStationState::CONNECTED && newStaState!=staState){
+                led->AnimatePixel(&SLOW, 5000);
+            }
+            led->Refresh();
+            staState=newStaState;
             delayMs(30);
         }
     }
@@ -162,17 +169,20 @@ public:
     
     void HandleFingerprintAction(uint16_t fingerIndex, int action) override
     {
-        ESP_LOGI(TAG, "Fingerprint action successfully triggered: fingerIndex=%d, actionIndex=%d", fingerIndex, action);
+        
         switch (action)
         {
         case 0:
+            ESP_LOGI(TAG, "Fingerprint action %d 'Open Door'", action);
             this->fingerDetected = millis();
             break;
         case 4:
+            ESP_LOGI(TAG, "Fingerprint action %d 'Play song'", action);
             buzzer->PlaySong(BUZZER::RINGTONE_SONG::MISSIONIMP);
             break;
         
         default:
+            ESP_LOGI(TAG, "Fingerprint action %d '?'", action);
             break;
         }        
     }
@@ -187,7 +197,7 @@ public:
         }
     }
 
-    esp_err_t provideWebsocketMessage(MessageSender *callback, httpd_req_t *req, httpd_ws_frame_t *ws_pkt, const webmanager::RequestWrapper *mw) override
+    eMessageReceiverResult provideWebsocketMessage(MessageSender *callback, httpd_req_t *req, httpd_ws_frame_t *ws_pkt, const webmanager::RequestWrapper *mw) override
     {
         this->callback = callback;
         flatbuffers::FlatBufferBuilder b(1024);
@@ -197,24 +207,24 @@ public:
         {
             const char *name = mw->request_as_RequestEnrollNewFinger()->name()->c_str();
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseEnrollNewFinger,
-                                                       webmanager::CreateResponseEnrollNewFinger(b, (uint16_t)fpm->TryEnrollAndStore(name)).Union());
+                                                       webmanager::CreateResponseEnrollNewFinger(b, (uint16_t)fpm->TryEnrollAndStore(name)).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
         case webmanager::Requests::Requests_RequestDeleteAllFingers:
         {
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseDeleteAllFingers,
-                                                       webmanager::CreateResponseDeleteAllFingers(b, (uint16_t)fpm->TryDeleteAll()).Union());
+                                                       webmanager::CreateResponseDeleteAllFingers(b, (uint16_t)fpm->TryDeleteAll()).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
         case webmanager::Requests::Requests_RequestDeleteFinger:
         {
             const char *name = mw->request_as_RequestDeleteFinger()->name()->c_str();
 
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseDeleteFinger,
-                                                       webmanager::CreateResponseDeleteFingerDirect(b, (uint16_t)fpm->TryDelete(name), name).Union());
+                                                       webmanager::CreateResponseDeleteFingerDirect(b, (uint16_t)fpm->TryDelete(name), name).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
         case webmanager::Requests::Requests_RequestCancelInstruction:
         {
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseCancelInstruction,
-                                                       webmanager::CreateResponseCancelInstruction(b, (uint16_t)fpm->CancelInstruction()).Union());
+                                                       webmanager::CreateResponseCancelInstruction(b, (uint16_t)fpm->CancelInstruction()).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
         case webmanager::Requests::Requests_RequestRenameFinger:
         {
@@ -222,7 +232,7 @@ public:
             const char *newName = mw->request_as_RequestRenameFinger()->new_name()->c_str();
 
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseRenameFinger,
-                                                       webmanager::CreateResponseRenameFinger(b, (uint16_t)fpm->TryRename(oldName, newName)).Union());
+                                                       webmanager::CreateResponseRenameFinger(b, (uint16_t)fpm->TryRename(oldName, newName)).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
             break;
         }
         case webmanager::Requests_RequestFingerprintSensorInfo:
@@ -242,21 +252,21 @@ public:
                                                                                                              p->dataPacketSizeCode,
                                                                                                              p->baudRateTimes9600,
                                                                                                              p->algVer, p->fwVer)
-                                                           .Union());
+                                                           .Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
             break;
         }
         case webmanager::Requests::Requests_RequestStoreFingerAction:
         {
             fpm->TryStoreFingerAction(mw->request_as_RequestStoreFingerAction()->fingerIndex(), mw->request_as_RequestStoreFingerAction()->actionIndex());
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerAction,
-                                                       webmanager::CreateResponseStoreFingerAction(b).Union());
+                                                       webmanager::CreateResponseStoreFingerAction(b).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
 
         case webmanager::Requests::Requests_RequestStoreFingerSchedule:
         {
             fpm->TryStoreFingerScheduler(mw->request_as_RequestStoreFingerSchedule()->fingerIndex(), mw->request_as_RequestStoreFingerSchedule()->scheduleName()->c_str());
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseStoreFingerSchedule,
-                                                       webmanager::CreateResponseStoreFingerSchedule(b).Union());
+                                                       webmanager::CreateResponseStoreFingerSchedule(b).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
         case webmanager::Requests::Requests_RequestFingers:
         {
@@ -295,20 +305,21 @@ public:
             }
             nvs_release_iterator(it);
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseFingers,
-                                                       webmanager::CreateResponseFingersDirect(b, &scheduleNames, &fingers_vector).Union());
+                                                       webmanager::CreateResponseFingersDirect(b, &scheduleNames, &fingers_vector).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
 
         case webmanager::Requests::Requests_RequestOpenDoor:
         {
             this->fingerDetected = millis();
             return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseOpenDoor,
-                                                       webmanager::CreateResponseOpenDoor(b).Union());
+                                                       webmanager::CreateResponseOpenDoor(b).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
 
         
         default:
-            return ESP_FAIL;
+            break;
         }
+       return eMessageReceiverResult::NOT_FOR_ME;
     }
 };
 
@@ -360,8 +371,8 @@ extern "C" void app_main(void)
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
-    led = new LED::M(PIN_LED, true);
-    led->Begin();
+    led = new LED::M(PIN_LED, false);
+    led->Begin(&FAST);
 
     sched = new SCHEDULER::Scheduler(nvsSchedulerName2SchedulerObjHandle);
     sched->Begin();

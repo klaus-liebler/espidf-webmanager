@@ -47,10 +47,11 @@ namespace FINGERPRINT
                 char fingerIndexAsString[6];
                 snprintf(fingerIndexAsString, 6, "%d", fingerIndex);
                 uint16_t actionIndex{0};
-                char schedulerName[NVS_KEY_NAME_MAX_SIZE];
-                schedulerName[0]=0;
+                
                 nvs_get_u16(this->nvsFingerIndex2ActionIndex, fingerIndexAsString, &actionIndex);
-                size_t schedulerNameLen{0};
+                size_t schedulerNameLen{16};
+                nvs_get_str(this->nvsFingerIndex2SchedulerName, fingerIndexAsString, nullptr, &schedulerNameLen);
+                char schedulerName[schedulerNameLen];
                 nvs_get_str(this->nvsFingerIndex2SchedulerName, fingerIndexAsString, schedulerName, &schedulerNameLen);
                 ESP_LOGI(TAG, "Fingerprint detected successfully: fingerIndex=%d, schedulerName=%s actionIndex=%d", fingerIndex, schedulerName, actionIndex);
                 if (scheduler->GetCurrentValueOfSchedule(schedulerName)>0){
@@ -71,7 +72,7 @@ namespace FINGERPRINT
                 ESP_ERROR_CHECK(nvs_commit(this->nvsFingerName2FingerIndex));
                 ESP_ERROR_CHECK(nvs_set_u16(this->nvsFingerIndex2ActionIndex, fingerIndexAsString, 0));
                 ESP_ERROR_CHECK(nvs_commit(this->nvsFingerIndex2ActionIndex));
-                ESP_ERROR_CHECK(nvs_set_str(this->nvsFingerIndex2SchedulerName, fingerIndexAsString, ""));
+                ESP_ERROR_CHECK(nvs_set_str(this->nvsFingerIndex2SchedulerName, fingerIndexAsString, NAME_OF_THE_ALWAYS_SCHEDULER));
                 ESP_ERROR_CHECK(nvs_commit(this->nvsFingerIndex2SchedulerName));
 
                 if (err != ESP_OK)
@@ -90,7 +91,15 @@ namespace FINGERPRINT
         RET Begin(gpio_num_t tx_host, gpio_num_t rx_host)
         {
             mutex = xSemaphoreCreateMutex();
-            return R503Pro::begin(tx_host, rx_host);
+            auto ret = R503Pro::begin(tx_host, rx_host);
+            if(ret!=RET::OK){
+                return ret;
+            }
+            //auto params=this->GetAllParams();
+            //TODO: Abgleich interner Speicher des R503 mit dem, was im Flash steht
+            //TODO: Fingerprint-Infos sollten in einem einzigen Objekt gespeichert werden.
+            return RET::OK;
+
         }
 
         RET TryEnrollAndStore(const char *fingerName)

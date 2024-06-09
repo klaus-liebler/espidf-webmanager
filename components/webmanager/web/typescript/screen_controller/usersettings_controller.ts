@@ -44,10 +44,11 @@ class ConfigGroupRT{
     `}
     private sendRequestGetUserSettings() {
         let b = new flatbuffers.Builder(256);
-        let n = RequestGetUserSettings.createRequestGetUserSettings(b, b.createString(this.groupCfg.Key));
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestGetUserSettings, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseGetUserSettings], 3000);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestGetUserSettings,
+            RequestGetUserSettings.createRequestGetUserSettings(b, b.createString(this.groupCfg.Key)),
+            [Responses.ResponseGetUserSettings]
+        );
     }
 
     private sendRequestSetUserSettings() {
@@ -57,11 +58,13 @@ class ConfigGroupRT{
             if(!v.HasAChangedValue()) continue;
             vectorOfSettings.push(v.WriteToFlatbufferBufferAndReturnSettingWrapperOffset(b));
         }
-        let settingsOffset:number= ResponseGetUserSettings.createSettingsVector(b, vectorOfSettings)
-        let n = RequestSetUserSettings.createRequestSetUserSettings(b, b.createString(this.groupCfg.Key), settingsOffset);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestSetUserSettings, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseSetUserSettings], 3000);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestSetUserSettings,
+            RequestSetUserSettings.createRequestSetUserSettings(b, b.createString(this.groupCfg.Key),
+                ResponseGetUserSettings.createSettingsVector(b, vectorOfSettings)
+            ),
+            [Responses.ResponseSetUserSettings]
+        );
     }
 
     private onBtnOpenCloseClicked(e:MouseEvent){

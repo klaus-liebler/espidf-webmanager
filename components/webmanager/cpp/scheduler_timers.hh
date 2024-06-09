@@ -23,24 +23,8 @@ namespace SCHEDULER
         virtual ~aTimer(){
 
         }
-        uint16_t GetCurrentValue() const
-        {
-            time_t currentTime;
-            struct tm *localTime;
-            time(&currentTime); // Get the current time
-            if (currentTime > 1800 && currentTime < 1716498366L)
-            { // Failsafe: If System runs for at least half an hour, but has no valid timestamp (constant is epoch time when writing this code)
-                return true;
-            }
-            localTime = localtime(&currentTime); // Convert the current time to the local time
-            int day_of_week = localTime->tm_wday;
-            int h = localTime->tm_hour;
-            int m = localTime->tm_min;
-            int s = localTime->tm_sec;
-            uint16_t val= this->GetCurrentValue(day_of_week, h, m, s);
-            ESP_LOGI(TAG, "On %d:%d:%d und weekday %d timer is %d", h,m,s,day_of_week, val);
-            return val;
-        }
+
+        virtual uint16_t GetCurrentValue(int d, int h, int m, int s) const = 0;
 
         static aTimer* BuildFromBlob(uint8_t* data){
             return nullptr;
@@ -67,10 +51,6 @@ namespace SCHEDULER
             len_in_out = b.GetSize();
             std::memcpy(data, b.GetBufferPointer(), len_in_out);
         }
-
-
-    protected:
-        virtual uint16_t GetCurrentValue(int d, int h, int m, int s) const = 0;
     };
 
     class cALWAYS: public aTimer
@@ -95,7 +75,7 @@ namespace SCHEDULER
         }
 
         
-    } ALWAYS("ALWAYS");
+    } ALWAYS(NAME_OF_THE_ALWAYS_SCHEDULER);
 
     class cNEVER: public aTimer
     {
@@ -191,7 +171,7 @@ namespace SCHEDULER
             return (m%2==0)?UINT16_MAX:0;
         }
 
-    } TestEvenMinutesOnOddMinutesOff("TestEvenMinutesOnOddMinutesOff");
+    } TestEvenMinutesOnOddMinutesOff("TestEvenOdd");
 
     class OneWeekIn15MinutesTimer :public aTimer{
         private:
@@ -223,6 +203,7 @@ namespace SCHEDULER
         }
 
         flatbuffers::Offset<scheduler::Schedule> CreateFlatbufferScheduleOffset(flatbuffers::FlatBufferBuilder &b) override{
+            ESP_LOGI(TAG, "Create Offset<scheduler::Schedule> for OneWeekIn15MinutesTimer %s", name.c_str());
             scheduler::OneWeekIn15MinutesData owi15md(data);
             return scheduler::CreateScheduleDirect(b,
                 name.c_str(),
@@ -246,6 +227,7 @@ namespace SCHEDULER
             
         }
         flatbuffers::Offset<scheduler::Schedule> CreateFlatbufferScheduleOffset(flatbuffers::FlatBufferBuilder &b) override{
+            ESP_LOGI(TAG, "Create Offset<scheduler::Schedule> for SunRandom %s", name.c_str());
             return scheduler::CreateScheduleDirect(b,
                 name.c_str(),
                 scheduler::uSchedule::uSchedule_SunRandom,

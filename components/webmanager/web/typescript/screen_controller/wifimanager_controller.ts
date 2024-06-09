@@ -134,20 +134,21 @@ export class WifimanagerController extends ScreenController {
 
     private sendRequestWifiAccesspoints(forceNewSearch:boolean) {
         let b = new flatbuffers.Builder(1024);
-        let n = RequestNetworkInformation.createRequestNetworkInformation(b, forceNewSearch);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestNetworkInformation, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseNetworkInformation], 30000);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestNetworkInformation,
+            RequestNetworkInformation.createRequestNetworkInformation(b, forceNewSearch),
+            [Responses.ResponseNetworkInformation], 30000
+        );
     }
 
     private sendRequestWifiConnect(ssid: string, password: string) {
         let b = new flatbuffers.Builder(1024);
-        let ssidOffset = b.createString(ssid);
-        let passwordOffset = b.createString(password);
-        let n = RequestWifiConnect.createRequestWifiConnect(b, ssidOffset, passwordOffset);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestWifiConnect, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseWifiConnectSuccessful, Responses.ResponseWifiConnectFailed], 30000);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestWifiConnect,
+            RequestWifiConnect.createRequestWifiConnect(b, b.createString(ssid), b.createString(password)),
+            [Responses.ResponseWifiConnectSuccessful, Responses.ResponseWifiConnectFailed],
+            30000
+        );
     }
 
     private onBtnWifiDisconnect(){
@@ -156,10 +157,12 @@ export class WifimanagerController extends ScreenController {
     
     private sendRequestWifiDisconnect() {
         let b = new flatbuffers.Builder(1024);
-        let n = RequestWifiDisconnect.createRequestWifiDisconnect(b)
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestWifiDisconnect, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array());
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestWifiDisconnect,
+            RequestWifiDisconnect.createRequestWifiDisconnect(b),
+            [Responses.ResponseWifiDisconnect],
+        );
+
     }
 
     onCreate(): void {

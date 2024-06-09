@@ -21,11 +21,12 @@ export class TimeseriesController extends ScreenController {
 
 
     private sendRequestTimeseries() {
-        let b = new flatbuffers.Builder(256);
-        let n = RequestTimeseries.createRequestTimeseries(b, 0, 0);
-        let mw = RequestWrapper.createRequestWrapper(b, Requests.RequestTimeseries, n);
-        b.finish(mw);
-        this.appManagement.sendWebsocketMessage(b.asUint8Array(), [Responses.ResponseTimeseriesDummy], 3000);
+        let b = new flatbuffers.Builder(1024);
+        this.appManagement.WrapAndFinishAndSend(b,
+            Requests.RequestTimeseries,
+            RequestTimeseries.createRequestTimeseries(b, 0, 0),
+            [Responses.ResponseTimeseriesDummy]
+        );
     }
 
     private updateDate(date: Date, granularity: TimeGranularity) {

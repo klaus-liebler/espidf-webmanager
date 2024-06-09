@@ -55,6 +55,16 @@ namespace LED
         BlinkPattern(tms_t timeOn, tms_t timeOff) : timeOn(timeOn), timeOff(timeOff) {}
     };
 
+    class :public AnimationPattern{
+        void Reset(tms_t now){}
+        bool Animate(tms_t now){return false;}
+    }CONST_OFF;
+
+    class :public AnimationPattern{
+        void Reset(tms_t now){}
+        bool Animate(tms_t now){return true;}
+    }CONST_ON;
+
 
     class M
     {
@@ -62,21 +72,20 @@ namespace LED
     	
         gpio_num_t gpio{GPIO_NUM_NC};
         bool invert{false};
-        AnimationPattern* pattern{nullptr};
+        AnimationPattern* pattern;
+        tms_t timeToAutoOff=INT64_MAX;//time is absolute!
     public:
         M(gpio_num_t gpio, bool invert=false):gpio(gpio), invert(invert) {}
 
-        esp_err_t SetPixel(bool on)
+        esp_err_t AnimatePixel(AnimationPattern *pattern, time_t timeToAutoOff=0)//time is relative, "0" means: no auto off
         {
-            pattern=nullptr;
-            gpio_set_level(this->gpio, on^invert);
-            return ESP_OK;
-        }
-
-        esp_err_t AnimatePixel(AnimationPattern *pattern)
-        {
-
+            if(pattern==nullptr) this->pattern=&CONST_OFF;
             tms_t now = (esp_timer_get_time() / 1000);
+            if(timeToAutoOff==0){
+                this->timeToAutoOff=INT64_MAX;
+            }else{
+                this->timeToAutoOff=now+timeToAutoOff;
+            }
             pattern->Reset(now);
             this->pattern = pattern;
             return ESP_OK;
@@ -84,16 +93,18 @@ namespace LED
 
         esp_err_t Refresh()
         {
-            auto p =this->pattern;
-            if (p == nullptr) return ESP_OK;
-            tms_t now = (esp_timer_get_time() / 1000);   
-            bool on = p->Animate(now);
+            tms_t now = (esp_timer_get_time() / 1000);
+            if(now>=timeToAutoOff){
+                this->pattern=&CONST_OFF;
+            } 
+            bool on = this->pattern->Animate(now);
             gpio_set_level(this->gpio, on^invert);
             return ESP_OK;
         }
 
-        esp_err_t Begin()
+        esp_err_t Begin(AnimationPattern *pattern=&CONST_OFF, tms_t timeToAutoOff=0)
         {
+            this->AnimatePixel(pattern, timeToAutoOff);
             return gpio_set_direction(this->gpio, GPIO_MODE_OUTPUT);
         }
     };
