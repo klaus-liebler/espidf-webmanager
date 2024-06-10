@@ -665,7 +665,11 @@ namespace webmanager
             auto bt = webmanager::Mac6(mac_buffer);
             esp_read_mac(mac_buffer, ESP_MAC_ETH);
             auto eth = webmanager::Mac6(mac_buffer);
+#if CONFIG_SOC_IEEE802154_SUPPORTED
             esp_read_mac(mac_buffer, ESP_MAC_IEEE802154);
+#else
+            for(int i=0;i<6;i++)mac_buffer[i]=0;
+#endif
             auto ieee = webmanager::Mac6(mac_buffer);
             esp_read_mac(mac_buffer, ESP_MAC_WIFI_SOFTAP);
             auto softap = webmanager::Mac6(mac_buffer);

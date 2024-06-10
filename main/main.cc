@@ -1,3 +1,5 @@
+//LCD-Display einbinden
+//NVS-Storage Failsafe
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,18 +27,57 @@
 #include "led_manager.hh"
 #include <buzzer.hh>
 
+#include <spilcd16.hh>
+#include <lineWriterToSpiLcdAdapter.hh>
+#include "FullTextLineRenderer.hh"
+#include "simple_menu.hh"
+#include "single_button.hh"
+#include <lcd_font.hh>
+#include <RGB565.hh>
+
+#include <ds18b20.hh>
+
+using namespace spilcd16;
+using namespace menu;
+using namespace display;
+
 #define TAG "MAIN"
 #define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
 #define NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE "finger"
 #define NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE "finger_act"
 #define NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE "finger_sched"
 #define NVS_SCHEDULER_NAMESPACE "scheduler"
+constexpr gpio_num_t PIN_FINGER_TX_HOST{GPIO_NUM_40};
+constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_38};
+constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_39};
+constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_6};
+constexpr gpio_num_t PIN_MOTOR{GPIO_NUM_42};
+constexpr gpio_num_t PIN_LED{GPIO_NUM_2};
+constexpr gpio_num_t PIN_I2C_SCL{GPIO_NUM_4};
+constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_5};
+constexpr gpio_num_t PIN_CAN_TX{GPIO_NUM_11};
+constexpr gpio_num_t PIN_CAN_RX{GPIO_NUM_10};
+
+constexpr gpio_num_t PIN_LCD_CS{GPIO_NUM_12};
+constexpr gpio_num_t PIN_LCD_RS{GPIO_NUM_13};
+constexpr gpio_num_t PIN_LCD_SCLK{GPIO_NUM_14};
+constexpr gpio_num_t PIN_LCD_MOSI{GPIO_NUM_21};
+constexpr gpio_num_t PIN_LCD_BACKLIGHT{GPIO_NUM_45};
+
+constexpr gpio_num_t PIN_BUTTON{GPIO_NUM_0};
+constexpr gpio_num_t PIN_ONEWIRE{GPIO_NUM_41};
+
+#include "handler_and_menu_definition.inc"
 
 FINGERPRINT::M *fpm{nullptr};
 SCHEDULER::Scheduler *sched{nullptr};
 CANMONITOR::M *canmonitor{nullptr};
 BUZZER::M *buzzer{nullptr};
 LED::M *led{nullptr};
+
+OneWire::OneWireBus<PIN_ONEWIRE> *onewireBus{nullptr};
+menu::MenuManagement *menuManagement{nullptr};
+display::iBacklight* backlightActivator;
 #if 0
 constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
 constexpr gpio_num_t PIN_485DE{GPIO_NUM_33};
@@ -64,32 +105,16 @@ constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_27};
 #endif
 
 
-constexpr gpio_num_t PIN_FINGER_TX_HOST{GPIO_NUM_40};
-constexpr gpio_num_t PIN_FINGER_RX_HOST{GPIO_NUM_38};
-constexpr gpio_num_t PIN_FINGER_IRQ{GPIO_NUM_39};
-
-constexpr gpio_num_t PIN_BUZZER{GPIO_NUM_6};
-constexpr gpio_num_t PIN_MOTOR{GPIO_NUM_42};
-constexpr gpio_num_t PIN_LED{GPIO_NUM_2};
-
-constexpr gpio_num_t PIN_I2C_SCL{GPIO_NUM_4};
-constexpr gpio_num_t PIN_I2C_SDA{GPIO_NUM_5};
-
-
-constexpr gpio_num_t PIN_CAN_TX{GPIO_NUM_11};
-constexpr gpio_num_t PIN_CAN_RX{GPIO_NUM_10};
-
-
-
 
 
 
 
 constexpr twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
-constexpr twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
+twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN_RX, TWAI_MODE_NORMAL);
 
 LED::BlinkPattern SLOW(200, 1000);
 LED::BlinkPattern FAST(200, 200);
+LED::BlinkPattern STANDBY(200, 10000);
 
 class Webmanager2Fingerprint2Hardware : public iMessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
 {
@@ -104,7 +129,7 @@ private:
     void task()
     {
         ESP_LOGI(TAG, "Central Management Task 'Webmanager2Fingerprint2Hardware' running");
-        buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
+        //buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
         auto wman = webmanager::M::GetSingleton();
         webmanager::WifiStationState staState{webmanager::WifiStationState::NO_CONNECTION};
         while (true)
@@ -113,13 +138,19 @@ private:
             bool energizeMotor = (now - fingerDetected) < 1000;
             gpio_set_level(PIN_MOTOR, energizeMotor);
             buzzer->Loop();
-            auto newStaState=wman->GetStaState();
+            button::ButtonPressResult res = button::ButtonLoop(menuManagement, PIN_BUTTON);
+            if(res!=button::ButtonPressResult::NO_CHANGE){
+                backlightActivator->Interaction(4000);
+            }
+            webmanager::WifiStationState newStaState=wman->GetStaState();
             if(newStaState!=webmanager::WifiStationState::CONNECTED && newStaState!=staState){
                 led->AnimatePixel(&FAST);
             }else if(newStaState==webmanager::WifiStationState::CONNECTED && newStaState!=staState){
                 led->AnimatePixel(&SLOW, 5000);
             }
             led->Refresh();
+            backlightActivator->BacklightLoop();
+            onewireBus->SensorLoop();
             staState=newStaState;
             delayMs(30);
         }
@@ -356,7 +387,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2SchedulerName));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2ActionIndex));
     ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerName2SchedulerObjHandle));
-
+/*
     nvs_iterator_t it{nullptr};
     esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_TYPE_ANY, &it);
     while (res == ESP_OK)
@@ -367,25 +398,41 @@ extern "C" void app_main(void)
         res = nvs_entry_next(&it);
     }
     nvs_release_iterator(it);
-
+*/
 
     buzzer = new BUZZER::M();
     buzzer->Begin(PIN_BUZZER);
-    led = new LED::M(PIN_LED, false);
+    
+    led = new LED::M(PIN_LED, false, &STANDBY);
     led->Begin(&FAST);
+
+    onewireBus = new OneWire::OneWireBus<PIN_ONEWIRE>();
+    onewireBus->Init();
+
+
+    spilcd16::M<SPI2_HOST, PIN_LCD_MOSI, PIN_LCD_SCLK, PIN_LCD_CS, PIN_LCD_RS, GPIO_NUM_NC, PIN_LCD_BACKLIGHT, LCD135x240(12), 4096, 10> lcd;
+    lcd.InitSpiAndGpio();
+    lcd.Init_ST7789(Color::BLACK);
+    backlightActivator=&lcd;
+    auto adapter = new display::LineWriterToSpiLcdAdapter<24, 135, 5, 5>(&lcd, 24);
+    auto root_folder = new FolderItem("root", &root_items);
+    menuManagement = new menu::MenuManagement(root_folder, adapter);
+    menuManagement->Init();
 
     sched = new SCHEDULER::Scheduler(nvsSchedulerName2SchedulerObjHandle);
     sched->Begin();
+    
     Webmanager2Fingerprint2Hardware *w2f = new Webmanager2Fingerprint2Hardware(nvsFingerName2FingerIndex, nvsFingerIndex2SchedulerName, nvsFingerIndex2ActionIndex);
     w2f->Begin();
-
 
     fpm = new FINGERPRINT::M(UART_NUM_1, PIN_FINGER_IRQ, w2f, sched, nvsFingerName2FingerIndex, nvsFingerIndex2SchedulerName, nvsFingerIndex2ActionIndex);
     fpm->Begin(PIN_FINGER_TX_HOST, PIN_FINGER_RX_HOST);
 
     canmonitor = new CANMONITOR::M(w2f);
+    g_config.intr_flags=ESP_INTR_FLAG_LOWMED;//|ESP_INTR_FLAG_SHARED;
     canmonitor->Begin(&t_config, &g_config);
-
+    esp_intr_dump(nullptr);
+    
     webmanager::M *wman = webmanager::M::GetSingleton();
     ESP_ERROR_CHECK(wman->Begin("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
     esp_log_level_set("esp_https_server", ESP_LOG_WARN);
@@ -400,7 +447,7 @@ extern "C" void app_main(void)
 
     while (true)
     {
-        ESP_LOGI(TAG, "Free Heap: %lu", esp_get_free_heap_size());
+        ESP_LOGI(TAG, "Free Heap: %lu, Temperature: %f", esp_get_free_heap_size(), onewireBus->GetMostRecentTemp(0));
         delayMs(5000);
     }
 }

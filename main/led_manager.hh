@@ -20,7 +20,7 @@ namespace LED
     class BlinkPattern : public AnimationPattern
     {
     private:
-        tms_t lastChange{0};
+        tms_t nextChange{0};
         bool state{false};
         tms_t timeOn;
         tms_t timeOff;
@@ -28,27 +28,21 @@ namespace LED
     public:
         void Reset(tms_t now) override
         {
-            lastChange = now;
+            nextChange = now+timeOn;
             state = true;
         }
         bool Animate(tms_t now) override
         {
+            if(now < nextChange) return state;
             if (state)
             {
-                if (lastChange + timeOn >= now)
-                {
-                    state = false;
-                    lastChange = now;
-                }
+                state = false;
+                nextChange = now+timeOff;
             }
             else
             {
-                if (lastChange + timeOff >= now)
-                {
-                    state = true;
-                    lastChange = now;
-
-                }
+                state = true;
+                nextChange = now+timeOn;
             }
             return state;
         }
@@ -74,12 +68,13 @@ namespace LED
         bool invert{false};
         AnimationPattern* pattern;
         tms_t timeToAutoOff=INT64_MAX;//time is absolute!
+        AnimationPattern* standbyPattern;
     public:
-        M(gpio_num_t gpio, bool invert=false):gpio(gpio), invert(invert) {}
+        M(gpio_num_t gpio, bool invert=false, AnimationPattern* standbyPattern=&CONST_OFF):gpio(gpio), invert(invert), standbyPattern(standbyPattern) {}
 
         esp_err_t AnimatePixel(AnimationPattern *pattern, time_t timeToAutoOff=0)//time is relative, "0" means: no auto off
         {
-            if(pattern==nullptr) this->pattern=&CONST_OFF;
+            if(pattern==nullptr) this->pattern=standbyPattern;
             tms_t now = (esp_timer_get_time() / 1000);
             if(timeToAutoOff==0){
                 this->timeToAutoOff=INT64_MAX;
@@ -95,7 +90,7 @@ namespace LED
         {
             tms_t now = (esp_timer_get_time() / 1000);
             if(now>=timeToAutoOff){
-                this->pattern=&CONST_OFF;
+                this->pattern=standbyPattern;
             } 
             bool on = this->pattern->Animate(now);
             gpio_set_level(this->gpio, on^invert);

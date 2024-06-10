@@ -10,8 +10,8 @@ namespace webmanager{
 
     constexpr size_t MAX_AP_NUM = 8;
     constexpr size_t STORAGE_LENGTH{16};
-    constexpr int ATTEMPTS_TO_RECONNECT{3};
-    constexpr time_t WIFI_MANAGER_RETRY_TIMER = 5000;
+    constexpr int ATTEMPTS_TO_RECONNECT{5};
+    constexpr time_t WIFI_MANAGER_RETRY_TIMER = 8000;
     constexpr time_t WIFI_MANAGER_SHUTDOWN_AP_TIMER = 60000;
     constexpr wifi_auth_mode_t AP_AUTHMODE{wifi_auth_mode_t::WIFI_AUTH_WPA2_PSK};
     constexpr char NVS_PARTITION[]{"nvs"};
