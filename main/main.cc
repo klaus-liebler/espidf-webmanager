@@ -26,20 +26,8 @@
 #include <interfaces.hh>
 #include "led_manager.hh"
 #include <buzzer.hh>
-
-#include <spilcd16.hh>
-#include <lineWriterToSpiLcdAdapter.hh>
-#include "FullTextLineRenderer.hh"
-#include "simple_menu.hh"
-#include "single_button.hh"
-#include <lcd_font.hh>
-#include <RGB565.hh>
-
 #include <ds18b20.hh>
 
-using namespace spilcd16;
-using namespace menu;
-using namespace display;
 
 #define TAG "MAIN"
 #define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
@@ -67,7 +55,6 @@ constexpr gpio_num_t PIN_LCD_BACKLIGHT{GPIO_NUM_45};
 constexpr gpio_num_t PIN_BUTTON{GPIO_NUM_0};
 constexpr gpio_num_t PIN_ONEWIRE{GPIO_NUM_41};
 
-#include "handler_and_menu_definition.inc"
 
 FINGERPRINT::M *fpm{nullptr};
 SCHEDULER::Scheduler *sched{nullptr};
@@ -76,8 +63,7 @@ BUZZER::M *buzzer{nullptr};
 LED::M *led{nullptr};
 
 OneWire::OneWireBus<PIN_ONEWIRE> *onewireBus{nullptr};
-menu::MenuManagement *menuManagement{nullptr};
-display::iBacklight* backlightActivator;
+
 #if 0
 constexpr gpio_num_t PIN_FINGER_TX{GPIO_NUM_32};
 constexpr gpio_num_t PIN_485DE{GPIO_NUM_33};
@@ -114,7 +100,7 @@ twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN
 
 LED::BlinkPattern SLOW(200, 1000);
 LED::BlinkPattern FAST(200, 200);
-LED::BlinkPattern STANDBY(200, 10000);
+LED::BlinkPattern STANDBY(100, 10000);
 
 class Webmanager2Fingerprint2Hardware : public iMessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
 {
@@ -138,10 +124,7 @@ private:
             bool energizeMotor = (now - fingerDetected) < 1000;
             gpio_set_level(PIN_MOTOR, energizeMotor);
             buzzer->Loop();
-            button::ButtonPressResult res = button::ButtonLoop(menuManagement, PIN_BUTTON);
-            if(res!=button::ButtonPressResult::NO_CHANGE){
-                backlightActivator->Interaction(4000);
-            }
+            
             webmanager::WifiStationState newStaState=wman->GetStaState();
             if(newStaState!=webmanager::WifiStationState::CONNECTED && newStaState!=staState){
                 led->AnimatePixel(&FAST);
@@ -149,7 +132,6 @@ private:
                 led->AnimatePixel(&SLOW, 5000);
             }
             led->Refresh();
-            backlightActivator->BacklightLoop();
             onewireBus->SensorLoop();
             staState=newStaState;
             delayMs(30);
@@ -161,8 +143,14 @@ public:
 
     void Begin()
     {
-        gpio_set_level(PIN_MOTOR, 0);
-        gpio_set_direction(PIN_MOTOR, GPIO_MODE_OUTPUT);
+        gpio_config_t io_conf = {
+            .pin_bit_mask=(1ULL<<PIN_MOTOR),
+            .mode=GPIO_MODE_OUTPUT,
+            .pull_up_en=GPIO_PULLUP_DISABLE,
+            .pull_down_en=GPIO_PULLDOWN_DISABLE,
+            .intr_type=GPIO_INTR_DISABLE,
+        };
+        gpio_config(&io_conf);
         xTaskCreate(static_task, "wm2fp2hw", 4096, this, 10, nullptr);
     }
 
@@ -339,11 +327,14 @@ public:
                                                        webmanager::CreateResponseFingersDirect(b, &scheduleNames, &fingers_vector).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
 
-        case webmanager::Requests::Requests_RequestOpenDoor:
+        case webmanager::Requests::Requests_RequestFingerActionManually:
         {
-            this->fingerDetected = millis();
-            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseOpenDoor,
-                                                       webmanager::CreateResponseOpenDoor(b).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
+            auto fingerIndex=mw->request_as_RequestFingerActionManually()->fingerIndex();
+            auto actionIndex=mw->request_as_RequestFingerActionManually()->actionIndex();
+            ESP_LOGI(TAG, "Manually do FingerprintAction");
+            this->HandleFingerprintAction(fingerIndex, actionIndex);
+            return callback->WrapAndFinishAndSendAsync(b, webmanager::Responses::Responses_ResponseFingerActionManually,
+                                                       webmanager::CreateResponseFingerActionManually(b).Union())==ESP_OK?eMessageReceiverResult::OK:eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
 
         
@@ -409,16 +400,6 @@ extern "C" void app_main(void)
     onewireBus = new OneWire::OneWireBus<PIN_ONEWIRE>();
     onewireBus->Init();
 
-
-    spilcd16::M<SPI2_HOST, PIN_LCD_MOSI, PIN_LCD_SCLK, PIN_LCD_CS, PIN_LCD_RS, GPIO_NUM_NC, PIN_LCD_BACKLIGHT, LCD135x240(12), 4096, 10> lcd;
-    lcd.InitSpiAndGpio();
-    lcd.Init_ST7789(Color::BLACK);
-    backlightActivator=&lcd;
-    auto adapter = new display::LineWriterToSpiLcdAdapter<24, 135, 5, 5>(&lcd, 24);
-    auto root_folder = new FolderItem("root", &root_items);
-    menuManagement = new menu::MenuManagement(root_folder, adapter);
-    menuManagement->Init();
-
     sched = new SCHEDULER::Scheduler(nvsSchedulerName2SchedulerObjHandle);
     sched->Begin();
     
@@ -431,7 +412,6 @@ extern "C" void app_main(void)
     canmonitor = new CANMONITOR::M(w2f);
     g_config.intr_flags=ESP_INTR_FLAG_LOWMED;//|ESP_INTR_FLAG_SHARED;
     canmonitor->Begin(&t_config, &g_config);
-    esp_intr_dump(nullptr);
     
     webmanager::M *wman = webmanager::M::GetSingleton();
     ESP_ERROR_CHECK(wman->Begin("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));

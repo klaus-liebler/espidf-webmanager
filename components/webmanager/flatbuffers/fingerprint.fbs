@@ -1,8 +1,12 @@
 namespace webmanager;
 
-table RequestOpenDoor{}
+table RequestFingerActionManually{
+    fingerIndex:uint16;
+    actionIndex:uint16;
+}
 
-table ResponseOpenDoor{}
+table ResponseFingerActionManually{
+}
 
 table RequestEnrollNewFinger{
     name:string;

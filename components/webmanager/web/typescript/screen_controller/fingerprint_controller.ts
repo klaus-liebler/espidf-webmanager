@@ -1,5 +1,5 @@
 import { Ref, createRef, ref } from "lit-html/directives/ref.js";
-import { Finger, NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerprintSensorInfo, RequestFingers, RequestOpenDoor, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerSchedule, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
+import { Finger, NotifyEnrollNewFinger, NotifyFingerDetected, RequestCancelInstruction, RequestDeleteAllFingers, RequestDeleteFinger, RequestEnrollNewFinger, RequestFingerActionManually, RequestFingerprintSensorInfo, RequestFingers, RequestRenameFinger, RequestStoreFingerAction, RequestStoreFingerSchedule, RequestWrapper, Requests, ResponseDeleteFinger, ResponseEnrollNewFinger, ResponseFingerprintSensorInfo, ResponseFingers, ResponseWrapper, Responses } from "../../generated/flatbuffers/webmanager";
 import { ScreenController } from "./screen_controller";
 import * as flatbuffers from 'flatbuffers';
 import { Html, Severity } from "../utils/common";
@@ -11,6 +11,7 @@ import trash from '../../svgs/solid/trash.svg?raw'
 import ban from '../../svgs/solid/ban.svg?raw'
 import door_open from '../../svgs/solid/door-open.svg?raw'
 import info from '../../svgs/solid/info.svg?raw'
+import music from '../../svgs/solid/music.svg?raw'
 import { unsafeSVG } from "lit-html/directives/unsafe-svg.js";
 
 enum RET {
@@ -109,7 +110,8 @@ export class FingerprintScreenController extends ScreenController {
         
         <h1>System</h1>
         <div class="buttons">
-            <button class="withsvg" @click=${() => this.btnOpenDoor()}>${unsafeSVG(door_open)}<span>Open Door<span></button>
+            <button class="withsvg" @click=${() => this.btnManualAction(0)}>${unsafeSVG(door_open)}<span>Open Door<span></button>
+            <button class="withsvg" @click=${() => this.btnManualAction(4)}>${unsafeSVG(music)}<span>Play Melody<span></button>
             <button class="withsvg" @click=${() => this.btnFingerprintGetSensorInfo()}>${unsafeSVG(info)}<span>Get Sensor Info<span></button>
         </div>
         <table>
@@ -333,12 +335,12 @@ export class FingerprintScreenController extends ScreenController {
         }
     }
 
-    btnOpenDoor() {
+    private btnManualAction(actionIndex:number) {
         let b = new flatbuffers.Builder(1024);
         this.appManagement.WrapAndFinishAndSend(b,
-            Requests.RequestOpenDoor,
-            RequestOpenDoor.createRequestOpenDoor(b),
-            [Responses.ResponseOpenDoor]
+            Requests.RequestFingerActionManually,
+            RequestFingerActionManually.createRequestFingerActionManually(b, 0, actionIndex),
+            [Responses.ResponseFingerActionManually]
         );
     }
     btnUpdateFingers() {

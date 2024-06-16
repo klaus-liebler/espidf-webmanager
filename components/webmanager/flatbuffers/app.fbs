@@ -41,7 +41,7 @@ union Responses{
 //fingerprint start
     ResponseStoreFingerAction,
     ResponseStoreFingerSchedule,
-    ResponseOpenDoor,
+    ResponseFingerActionManually,
     ResponseEnrollNewFinger,
     NotifyEnrollNewFinger,
     NotifyFingerDetected,
@@ -71,7 +71,7 @@ union Requests{
 //fingerprint start
     RequestStoreFingerAction,
     RequestStoreFingerSchedule,
-    RequestOpenDoor,
+    RequestFingerActionManually,
     RequestEnrollNewFinger,
     RequestDeleteFinger,
     RequestDeleteAllFingers,
