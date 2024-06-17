@@ -10,7 +10,7 @@ import * as snsct from "./gulpfile_sensact"
 
 import {writeFileCreateDirLazy } from "./gulpfile_utils";
 import { flashusersettings, usersettings_createPartition, usersettings_distribute_ts, usersettings_generate_cpp_code } from "./gulpfile_usersettings";
-import { COM_PORT, ESP32_HOSTNAME_TEMPLATE } from "./gulpfile_config";
+import { CLIENT_CERT_USER_NAME, COM_PORT, ESP32_HOSTNAME_TEMPLATE, PUBLIC_SERVER_FQDN } from "./gulpfile_config";
 import * as P from "./paths";
 
 
@@ -60,6 +60,9 @@ exports.build = gulp.series(
   exports.clean = clean;
   exports.rootCA = (cb: gulp.TaskFunctionCallback) => {
     let CA = cert.CreateRootCA();
+    if(fs.existsSync(P.ROOT_CA_PEM_CRT) || fs.existsSync(P.ROOT_CA_PEM_CRT)){
+      return cb(new Error("rootCA Certificate and Key have already been created. Delete them manually to be able to recreate them"));
+    }
     writeFileCreateDirLazy(P.ROOT_CA_PEM_CRT, CA.certificate);
     writeFileCreateDirLazy(P.ROOT_CA_PEM_PRVTKEY, CA.privateKey, cb);
   }
@@ -67,12 +70,22 @@ exports.build = gulp.series(
   exports.certificates = (cb: gulp.TaskFunctionCallback) => {
     const hostname = fs.readFileSync(P.HOSTNAME_FILE).toString();//esp32host_2df5c8
     const this_pc_name = os.hostname();
-    let hostCert = cert.CreateCert(hostname, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
-    writeFileCreateDirLazy(P.HOST_CERT_PEM_CRT, hostCert.certificate);
-    writeFileCreateDirLazy(P.HOST_CERT_PEM_PRVTKEY, hostCert.privateKey, cb);
-    let testserverCert = cert.CreateCert(this_pc_name, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
+    
+    let esp32Cert = cert.CreateAndSignCert("SYSTEM_"+hostname, hostname, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
+    writeFileCreateDirLazy(P.ESP32_CERT_PEM_CRT, esp32Cert.certificate);
+    writeFileCreateDirLazy(P.ESP32_CERT_PEM_PRVTKEY, esp32Cert.privateKey);
+    
+    let testserverCert = cert.CreateAndSignCert("Testserver", this_pc_name, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
     writeFileCreateDirLazy(P.TESTSERVER_CERT_PEM_CRT, testserverCert.certificate);
-    writeFileCreateDirLazy(P.TESTSERVER_CERT_PEM_PRVTKEY, testserverCert.privateKey, cb);
+    writeFileCreateDirLazy(P.TESTSERVER_CERT_PEM_PRVTKEY, testserverCert.privateKey);
+
+    let publicServerCert = cert.CreateAndSignCert("Klaus Lieber Personal Server", PUBLIC_SERVER_FQDN, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
+    writeFileCreateDirLazy(P.PUBLICSERVER_CERT_PEM_CRT, publicServerCert.certificate);
+    writeFileCreateDirLazy(P.PUBLICSERVER_CERT_PEM_PRVTKEY, publicServerCert.privateKey, cb);
+
+    let clientCert = cert.CreateAndSignClientCert(CLIENT_CERT_USER_NAME, P.ROOT_CA_PEM_CRT, P.ROOT_CA_PEM_PRVTKEY);
+    writeFileCreateDirLazy(P.CLIENT_CERT_PEM_CRT, clientCert.certificate);
+    writeFileCreateDirLazy(P.CLIENT_CERT_PEM_PRVTKEY, clientCert.privateKey, cb);
   }
   
   exports.gethostname = async (cb: gulp.TaskFunctionCallback) => {

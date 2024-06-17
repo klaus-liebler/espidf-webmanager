@@ -16,11 +16,17 @@ export const GENERATED = path.join(ROOT, "generated");
 export const TESTSERVER = path.join(ROOT, "testserver");
 
 export const ROOT_CA_PEM_CRT = path.join(CERTIFICATES, "rootCA.pem.crt");
-export const ROOT_CA_PEM_PRVTKEY = path.join(CERTIFICATES, "rootCA.pem.prvtkey");
-export const HOST_CERT_PEM_CRT = path.join(CERTIFICATES, "host.pem.crt");
-export const HOST_CERT_PEM_PRVTKEY = path.join(CERTIFICATES, "host.pem.prvtkey");
+export const ROOT_CA_PEM_PRVTKEY = path.join(CERTIFICATES, "rootCA.pem.key");
+export const ESP32_CERT_PEM_CRT = path.join(CERTIFICATES, "esp32.pem.crt");
+export const ESP32_CERT_PEM_PRVTKEY = path.join(CERTIFICATES, "esp32.pem.key");
 export const TESTSERVER_CERT_PEM_CRT = path.join(CERTIFICATES, "testserver.pem.crt");
-export const TESTSERVER_CERT_PEM_PRVTKEY = path.join(CERTIFICATES, "testserver.pem.prvtkey");
+export const TESTSERVER_CERT_PEM_PRVTKEY = path.join(CERTIFICATES, "testserver.pem.key");
+export const PUBLICSERVER_CERT_PEM_CRT = path.join(CERTIFICATES, "publicserver.pem.crt");
+export const PUBLICSERVER_CERT_PEM_PRVTKEY = path.join(CERTIFICATES, "publicserver.pem.key");
+
+export const CLIENT_CERT_PEM_CRT = path.join(CERTIFICATES, "client.pem.crt");
+export const CLIENT_CERT_PEM_PRVTKEY = path.join(CERTIFICATES, "client.pem.key");
+
 
 
 export const FLATBUFFERS_SCHEMA_PATH = path.join(ROOT, "flatbuffers", "app.fbs");
