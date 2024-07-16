@@ -1,5 +1,3 @@
-// LCD-Display einbinden
-// NVS-Storage Failsafe
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -30,7 +28,7 @@
 #include <mqtt_client.h>
 
 #define TAG "MAIN"
-#define NVS_FINGER_PARTITION NVS_DEFAULT_PART_NAME
+#define NVS_PARTITION_NAME NVS_DEFAULT_PART_NAME
 #define NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE "finger"
 #define NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE "finger_act"
 #define NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE "finger_sched"
@@ -320,7 +318,7 @@ public:
             std::vector<flatbuffers::Offset<webmanager::Finger>> fingers_vector;
 
             nvs_iterator_t it{nullptr};
-            esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE, NVS_TYPE_U16, &it);
+            esp_err_t res = nvs_entry_find(NVS_PARTITION_NAME, NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE, NVS_TYPE_U16, &it);
             while (res == ESP_OK)
             {
                 nvs_entry_info_t info;
@@ -442,11 +440,11 @@ public:
 
 extern "C" void app_main(void)
 {
-    esp_err_t ret = nvs_flash_init_partition(NVS_FINGER_PARTITION);
+    esp_err_t ret = nvs_flash_init_partition(NVS_PARTITION_NAME);
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init_partition(NVS_FINGER_PARTITION));
+        ESP_ERROR_CHECK(nvs_flash_init_partition(NVS_PARTITION_NAME));
     }
 
     httpd_ssl_config_t httpd_conf = HTTPD_SSL_CONFIG_DEFAULT();
@@ -470,10 +468,10 @@ extern "C" void app_main(void)
     nvs_handle_t nvsFingerIndex2SchedulerName;
     nvs_handle_t nvsFingerIndex2ActionIndex;
     nvs_handle_t nvsSchedulerName2SchedulerObjHandle;
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerName2FingerIndex));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2SchedulerName));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2ActionIndex));
-    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_FINGER_PARTITION, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerName2SchedulerObjHandle));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_PARTITION_NAME, NVS_FINGER_NAME_2_FINGER_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerName2FingerIndex));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_PARTITION_NAME, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2SchedulerName));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_PARTITION_NAME, NVS_FINGER_INDEX_2_ACTION_INDEX_NAMESPACE, NVS_READWRITE, &nvsFingerIndex2ActionIndex));
+    ESP_ERROR_CHECK(nvs_open_from_partition(NVS_PARTITION_NAME, NVS_SCHEDULER_NAMESPACE, NVS_READWRITE, &nvsSchedulerName2SchedulerObjHandle));
     /*
         nvs_iterator_t it{nullptr};
         esp_err_t res = nvs_entry_find(NVS_FINGER_PARTITION, NVS_FINGER_INDEX_2_SCHEDULER_NAME_NAMESPACE, NVS_TYPE_ANY, &it);
@@ -515,7 +513,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(wman->Begin("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
     esp_log_level_set("esp_https_server", ESP_LOG_WARN);
     ESP_ERROR_CHECK(httpd_ssl_start(&http_server, &httpd_conf));
-    ESP_LOGI(TAG, "HTTPS Server listening on https://%s:%d", wman->GetSingleton()->GetHostname(), httpd_conf.port_secure);
+    ESP_LOGI(TAG, "HTTPS Server listening on https://%s:%d", wman->GetHostname(), httpd_conf.port_secure);
     wman->RegisterHTTPDHandlers(http_server);
     std::vector<iMessageReceiver *> plugins{w2f, sched};
     wman->SetPlugins(&plugins);
