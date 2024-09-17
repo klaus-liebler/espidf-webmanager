@@ -6,3 +6,4 @@ managed_components/
 **/certificates/
 **/generated/
 **/dist/
+main/secrets.hh

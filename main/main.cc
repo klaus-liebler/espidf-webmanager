@@ -101,7 +101,7 @@ twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(PIN_CAN_TX, PIN_CAN
 
 LED::BlinkPattern SLOW(200, 1000);
 LED::BlinkPattern FAST(200, 200);
-LED::BlinkPattern STANDBY(100, 10000);
+LED::BlinkPattern STANDBY(50, 10000);
 
 class Webmanager2Fingerprint2Hardware : public iMessageReceiver, public FINGERPRINT::iFingerprintActionHandler, public CANMONITOR::iCanmonitorHandler
 {
@@ -112,13 +112,15 @@ private:
     nvs_handle_t nvsFingerIndex2SchedulerName;
     nvs_handle_t nvsFingerIndex2ActionIndex;
     time_t fingerDetected{-1000000};
-    static void static_task(void *args) { static_cast<Webmanager2Fingerprint2Hardware *>(args)->task(); }
+    
     void task()
     {
         ESP_LOGI(TAG, "Central Management Task 'Webmanager2Fingerprint2Hardware' running");
         // buzzer->PlaySong(BUZZER::RINGTONE_SONG::POSITIVE);
         auto wman = webmanager::M::GetSingleton();
         webmanager::WifiStationState staState{webmanager::WifiStationState::NO_CONNECTION};
+        TickType_t previousWakeTime = xTaskGetTickCount();
+        TickType_t FREQUENCY = pdMS_TO_TICKS(50);
         while (true)
         {
             time_t now = millis();
@@ -138,9 +140,9 @@ private:
                 led->AnimatePixel(&SLOW, 5000);
             }
             led->Refresh();
-            onewireBus->SensorLoop();
+            onewireBus->Loop(millis());
             staState = newStaState;
-            delayMs(30);
+            xTaskDelayUntil(&previousWakeTime, FREQUENCY);
         }
     }
 
@@ -157,7 +159,7 @@ public:
             .intr_type = GPIO_INTR_DISABLE,
         };
         gpio_config(&io_conf);
-        xTaskCreate(static_task, "wm2fp2hw", 4096, this, 10, nullptr);
+        xTaskCreate([](void *p){((Webmanager2Fingerprint2Hardware *)p)->task(); }, "wm2fp2hw", 4096, this, 10, nullptr);
     }
 
     void HandleCanMessageReceived(uint32_t messageId, uint8_t data[8], size_t dataLen) override
@@ -510,7 +512,8 @@ extern "C" void app_main(void)
     esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, Webmanager2Fingerprint2Hardware::mqtt_event_handler, w2f);
 
     webmanager::M *wman = webmanager::M::GetSingleton();
-    ESP_ERROR_CHECK(wman->Begin("ESP32AP_", "password", "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
+    #include "secrets.hh"
+    ESP_ERROR_CHECK(wman->Begin("ESP32AP_%02x%02x%02x", WIFI_AP_PASSWORD, "finger_test", gpio_get_level(GPIO_NUM_0) == 1 ? false : true, true));
     esp_log_level_set("esp_https_server", ESP_LOG_WARN);
     ESP_ERROR_CHECK(httpd_ssl_start(&http_server, &httpd_conf));
     ESP_LOGI(TAG, "HTTPS Server listening on https://%s:%d", wman->GetHostname(), httpd_conf.port_secure);
@@ -525,9 +528,9 @@ extern "C" void app_main(void)
     {
         uint32_t free_heap = esp_get_free_heap_size();
         ESP_LOGI(TAG, "Free Heap: %lu, Temperature: %f", free_heap, onewireBus->GetMostRecentTemp(0));
-        char cbuf[64];
-        int usedBuf = snprintf(cbuf, 64, "{time:%lld, heap:%ld}", esp_timer_get_time(), free_heap);
-        esp_mqtt_client_publish(mqtt_client, "/L0/HWR/status", cbuf, usedBuf, 0, 0);
+        //char cbuf[64];
+        //int usedBuf = snprintf(cbuf, 64, "{time:%lld, heap:%ld}", esp_timer_get_time(), free_heap);
+        //esp_mqtt_client_publish(mqtt_client, "/L0/HWR/status", cbuf, usedBuf, 0, 0);
         delayMs(5000);
     }
 }
